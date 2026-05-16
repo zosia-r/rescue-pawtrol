@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: rescue_pawtrol
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5434:5432"
+    volumes:
+      - fresh_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  fresh_postgres_data:
