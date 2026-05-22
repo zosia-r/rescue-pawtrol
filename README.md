@@ -63,5 +63,6 @@ docker compose down -v
 The project is a work in progress, expect updates and improvements over time.
 
 ## Authors
-💗 Alicja Rembisz 
+💗 Alicja Rembisz
+
 💗 Zofia Różańska
