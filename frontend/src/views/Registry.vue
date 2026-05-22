@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated } from 'vue'
 import axios from 'axios'
 
 const expandedRows = ref([])
@@ -249,6 +249,9 @@ const submitMedicalRecord = async (animalId) => {
 }
 
 onMounted(() => {
+  fetchAnimals()
+})
+onActivated(() => {
   fetchAnimals()
 })
 
