@@ -25,3 +25,8 @@ replay_pid*
 
 # Bun
 bun.lock
+
+# IntelliJ IDEA / JetBrains
+.idea/
+*.iml
+
