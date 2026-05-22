@@ -13,6 +13,7 @@ public class Animal {
 
     private String species;
     private String name;
+    private Integer age;
     private String adoptionStatus;
     private Boolean isQuarantined;
 

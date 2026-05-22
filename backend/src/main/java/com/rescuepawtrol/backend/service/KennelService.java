@@ -14,4 +14,8 @@ public class KennelService {
     public List<Kennel> getAllKennels() {
         return kennelRepository.findAll();
     }
+
+    public Kennel saveKennel(Kennel kennel) {
+        return kennelRepository.save(kennel);
+    }
 }

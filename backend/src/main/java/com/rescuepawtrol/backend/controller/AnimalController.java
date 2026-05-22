@@ -4,7 +4,9 @@ import com.rescuepawtrol.backend.model.Animal;
 import com.rescuepawtrol.backend.service.AnimalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/animals")
@@ -12,6 +14,8 @@ import java.util.List;
 public class AnimalController {
 
     private final AnimalService animalService;
+
+    record KennelAssignmentRequest(Long kennelId) {}
 
     @GetMapping
     public List<Animal> getAllAnimals() {
@@ -23,4 +27,9 @@ public class AnimalController {
         return animalService.saveAnimal(animal);
     }
 
+    @PatchMapping("/{id}/kennel")
+    public Animal assignKennel(@PathVariable Long id,
+                               @RequestBody Map<String, Long> body) {
+        return animalService.assignKennel(id, body.get("kennelId"));
+    }
 }
