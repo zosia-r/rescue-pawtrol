@@ -6,7 +6,6 @@ import com.rescuepawtrol.backend.repository.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,30 +22,30 @@ public class DatabaseSeeder {
             MedicalRecordRepository medicalRecordRepository,
             AdoptionCardRepository adoptionCardRepository,
             InterventionRepository interventionRepository,
-            RoutePointRepository routePointRepository,
-            PasswordEncoder passwordEncoder) {
+            RoutePointRepository routePointRepository) { // Usunięto PasswordEncoder
 
         return args -> {
 
-            // ─── 1. EMPLOYEES ────────────────────────────────────────────────
+            // ─── 1. EMPLOYEES (Synchronizacja z Keycloak) ───────────────────
             Employee admin = null;
             Employee driver = null;
 
             if (employeeRepository.count() == 0) {
+                // Pracownik zsynchronizowany z użytkownikiem 'admin' w Keycloak
                 admin = new Employee();
                 admin.setFirstName("Alicja");
                 admin.setEmail("admin@rescuepawtrol.pl");
-                admin.setPassword(passwordEncoder.encode("admin123"));
-                admin.setRole(EmployeeRole.values()[0]);
+                // UWAGA: Nie ustawiamy hasła. Keycloak to obsługuje.
+                admin.setRole(EmployeeRole.values()[0]); // Zależnie od struktury enuma (np. MANAGER)
 
+                // Pracownik zsynchronizowany z użytkownikiem 'driver' w Keycloak
                 driver = new Employee();
                 driver.setFirstName("John");
                 driver.setEmail("driver@rescuepawtrol.pl");
-                driver.setPassword(passwordEncoder.encode("driver123"));
-                driver.setRole(EmployeeRole.values()[0]);
+                driver.setRole(EmployeeRole.values()[0]); // Zależnie od struktury enuma (np. DISPATCHER)
 
                 employeeRepository.saveAll(List.of(admin, driver));
-                System.out.println("✅ Seeded: Employees");
+                System.out.println("✅ Seeded: Employees (Keycloak synced emails)");
             } else {
                 admin  = employeeRepository.findByEmail("admin@rescuepawtrol.pl").orElse(null);
                 driver = employeeRepository.findByEmail("driver@rescuepawtrol.pl").orElse(null);
@@ -200,7 +199,7 @@ public class DatabaseSeeder {
                 System.out.println("✅ Seeded: Interventions & Route Points");
             }
 
-            System.out.println("🚀 Baza danych jest w pełni gotowa do testów!");
+            System.out.println("🚀 Baza danych jest w pełni gotowa do testów z Keycloak!");
         };
     }
 

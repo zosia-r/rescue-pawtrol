@@ -134,10 +134,7 @@ const newMedical = ref({})
 
 const fetchAnimals = async () => {
   try {
-    const token = localStorage.getItem('jwt_token')
-    const response = await axios.get('http://localhost:8080/api/animals', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await axios.get('http://localhost:8080/api/animals')
 
     animals.value = response.data.map(animal => {
       if (!newMedical.value[animal.id]) {
@@ -168,10 +165,7 @@ const toggleRow = async (id) => {
 
     if (animal && animal.medicalHistory.length === 0) {
       try {
-        const token = localStorage.getItem('jwt_token')
-        const response = await axios.get(`http://localhost:8080/api/medical-records/animal/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const response = await axios.get(`http://localhost:8080/api/medical-records/animal/${id}`)
 
         animal.medicalHistory = response.data.map(record => ({
           date: record.recordDate,
@@ -192,15 +186,11 @@ const submitNewAnimal = async () => {
   if (!newAnimal.value.name) return alert("Please provide the animal's name!");
 
   try {
-    const token = localStorage.getItem('jwt_token')
-
     await axios.post('http://localhost:8080/api/animals', {
       name: newAnimal.value.name,
       species: newAnimal.value.species,
       adoptionStatus: newAnimal.value.status,
       isQuarantined: false
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
     })
 
     showAddModal.value = false;
@@ -218,8 +208,6 @@ const submitMedicalRecord = async (animalId) => {
   if (!recordData.description || !recordData.type) return alert("Please fill in the record type and description!");
 
   try {
-    const token = localStorage.getItem('jwt_token')
-
     const payload = {
       recordDate: new Date().toISOString().split('T')[0],
       recordType: recordData.type,
@@ -228,9 +216,7 @@ const submitMedicalRecord = async (animalId) => {
       animal: { id: animalId }
     };
 
-    const response = await axios.post('http://localhost:8080/api/medical-records', payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await axios.post('http://localhost:8080/api/medical-records', payload);
 
     const animal = animals.value.find(a => a.id === animalId);
     animal.medicalHistory.push({
@@ -267,7 +253,7 @@ const getStatusClass = (status) => {
 </script>
 
 <style scoped>
-/* --- STYLE BEZ ZMIAN --- */
+/* STARE STYLE BEZ ZMIAN */
 .registry-card { background-color: #FFFFFF; border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02); overflow: hidden; }
 .registry-table { width: 100%; border-collapse: collapse; text-align: left; }
 .registry-table th { padding: 1.25rem 1rem; font-size: 0.85rem; font-weight: 600; color: #374151; border-bottom: 1px solid #E5E7EB; }

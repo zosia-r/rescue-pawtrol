@@ -21,12 +21,19 @@
       </div>
 
       <div class="navbar-right">
-        <button class="nav-btn" :class="{ active: route.path === '/map' }" @click="router.push('/map')">Map</button>
-        <button class="nav-btn" :class="{ active: route.path === '/floor-plan' }" @click="router.push('/floor-plan')">Floor Plan</button>
-        <button class="nav-btn" :class="{ active: route.path === '/' }" @click="router.push('/')">Registry</button>
-        <button class="nav-btn" :class="{ active: route.path === '/reports' }" @click="router.push('/reports')">Reports</button>
+        <button v-if="hasRole('DISPATCHER') || hasRole('MANAGER')"
+                class="nav-btn" :class="{ active: route.path === '/map' }" @click="router.push('/map')">Map</button>
 
-        <button class="nav-btn logout-btn" @click="handleLogout">Wyloguj</button>
+        <button v-if="hasRole('CARETAKER') || hasRole('MANAGER')"
+                class="nav-btn" :class="{ active: route.path === '/floor-plan' }" @click="router.push('/floor-plan')">Floor Plan</button>
+
+        <button v-if="hasRole('CARETAKER') || hasRole('MANAGER')"
+                class="nav-btn" :class="{ active: route.path === '/' }" @click="router.push('/')">Registry</button>
+
+        <button v-if="hasRole('MANAGER')"
+                class="nav-btn" :class="{ active: route.path === '/reports' }" @click="router.push('/reports')">Reports</button>
+
+        <button @click="handleLogout" class="logout-btn">Log out</button>
       </div>
     </header>
 
@@ -39,23 +46,27 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import keycloak from '../keycloak'
 
 const router = useRouter()
 const route = useRoute()
 const searchQuery = ref('')
 
-// Dynamiczna zmiana podtytułu
+const hasRole = (roleName) => {
+  return keycloak.realmAccess && keycloak.realmAccess.roles.includes(roleName);
+}
+
+const handleLogout = () => {
+  localStorage.removeItem('jwt_token')
+  keycloak.logout({ redirectUri: 'http://localhost:5173' })
+}
+
 const currentModuleName = computed(() => {
   if (route.path === '/map') return 'Map Module'
   if (route.path === '/floor-plan') return 'Facility Module'
   if (route.path === '/reports') return 'Analytics & Reporting Module'
-  return 'Animal Registry Module' // Domyślnie dla '/'
+  return 'Animal Registry Module'
 })
-
-const handleLogout = () => {
-  localStorage.removeItem('jwt_token')
-  router.push('/login')
-}
 </script>
 
 <style scoped>
