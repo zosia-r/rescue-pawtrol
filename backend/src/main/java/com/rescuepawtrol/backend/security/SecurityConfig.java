@@ -16,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
+import java.util.*;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-// uruchamiane raz przy starcie aplikacji
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -58,7 +58,8 @@ public class SecurityConfig {
                 }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
+                        // Upewnij się, że endpointy Keycloaka/Auth są publiczne, jeśli potrzebne
+                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/animals/**").hasAnyRole("CARETAKER", "MANAGER")
                         .requestMatchers("/api/medical-records/**").hasAnyRole("CARETAKER", "MANAGER")
                         .requestMatchers("/api/interventions/**").hasAnyRole("DISPATCHER", "MANAGER")
@@ -66,23 +67,27 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                // UŻYWAMY TYLKO OAUTH2 RESOURCE SERVER
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                );
 
         return http.build();
     }
 
     private Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
-        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
+        jwtConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            // Keycloak wysyła role w "realm_access" -> "roles"
             Map<String, Object> realmAccess = jwt.getClaim("realm_access");
             if (realmAccess == null || !realmAccess.containsKey("roles")) {
                 return Collections.emptyList();
             }
             List<String> roles = (List<String>) realmAccess.get("roles");
             return roles.stream()
-                    .map(roleName -> new SimpleGrantedAuthority("ROLE_" + roleName)) // Spring wymaga prefiksu ROLE_
+                    .map(roleName -> new SimpleGrantedAuthority("ROLE_" + roleName))
                     .collect(Collectors.toList());
         });
-        return converter;
+        return jwtConverter;
     }
 }
