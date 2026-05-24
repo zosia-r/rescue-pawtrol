@@ -3,7 +3,10 @@ import App from './App.vue'
 import router from './router'
 import keycloak from './keycloak'
 import axios from 'axios'
-keycloak.init({ onLoad: 'login-required' }).then((authenticated) => {
+keycloak.init({
+    onLoad: 'login-required',
+    checkLoginIframe: false
+}).then((authenticated) => {
     if (!authenticated) {
         window.location.reload();
     } else {

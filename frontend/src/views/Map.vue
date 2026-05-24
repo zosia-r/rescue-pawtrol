@@ -82,10 +82,9 @@ import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// STAN KOMPONENTU
-const appMode = ref('DISPATCHER') // 'DISPATCHER' lub 'DRIVER'
+const appMode = ref('DISPATCHER')
 const map = ref(null)
-const markers = ref([]) // Będziemy tu trzymać obiekty: { id: ID_ZGLOSZENIA, marker: OBIEKT_LEAFLET }
+const markers = ref([])
 const routeLine = ref(null)
 const isRouteGenerated = ref(false)
 const interventions = ref([])
@@ -94,18 +93,28 @@ const showAddModal = ref(false)
 let tempMarker = null
 const newReportData = ref({ latitude: 0, longitude: 0 })
 
-// STAN KIEROWCY
 const driverLocation = ref({ lat: 51.105000, lng: 17.035000 })
 let driverMarker = null
 
-// IKONY PINEZEK
 const getCustomIcon = (type) => {
   const color = type === 'Base' ? '#111827' : '#EF4444';
-  const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}" width="36px" height="36px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/><circle cx="12" cy="9" r="2.5" fill="white"/></svg>`;
-  return L.divIcon({ className: 'custom-pin', html: svgIcon, iconSize: [36, 36], iconAnchor: [18, 36] })
+
+  const svgIcon = `
+    <svg style="display: block; width: 36px; height: 36px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      <circle cx="12" cy="9" r="2.5" fill="white"/>
+    </svg>
+  `;
+
+  return L.divIcon({
+    className: 'custom-pin',
+    html: svgIcon,
+    iconSize: [36, 36],
+    iconAnchor: [18, 33],
+    popupAnchor: [0, -33]
+  })
 }
 
-// IKONA AUTA KIEROWCY (Duża i widoczna)
 const getDriverIcon = () => {
   return L.divIcon({
     className: 'driver-pin',
@@ -127,38 +136,31 @@ const initMap = () => {
 
   L.control.zoom({ position: 'topright' }).addTo(map.value)
 
-  // Baza
   L.marker([shelterLocation.lat, shelterLocation.lng], { icon: getCustomIcon('Base') })
       .bindPopup('<b>🏠 Shelter Base</b>')
       .addTo(map.value)
 
-  // Autko kierowcy (Przeciągalne!)
   driverMarker = L.marker([driverLocation.value.lat, driverLocation.value.lng], {
     icon: getDriverIcon(),
     draggable: true,
-    zIndexOffset: 1000 // Zawsze na wierzchu
+    zIndexOffset: 1000
   }).addTo(map.value)
 
   driverMarker.bindPopup('<b>🚓 Driver Unit 1</b><br>Drag me to move!')
 
-  // EVENT: Co się dzieje jak przesuwamy autko?
   driverMarker.on('drag', (e) => {
     driverLocation.value.lat = e.latlng.lat;
     driverLocation.value.lng = e.latlng.lng;
 
-    // Jeśli trasa jest włączona, rysuj ją na żywo podczas jazdy!
     if (isRouteGenerated.value) {
-      generateRoute(false) // false = nie centruj mapy podczas przeciągania
+      generateRoute(false)
     }
   })
-
-  // EVENT: Kliknięcie w mapę (tylko dla dyspozytora)
   map.value.on('click', handleMapClick)
 }
 
 const setMode = (mode) => {
   appMode.value = mode;
-  // Zmiana kursora
   document.querySelector('.map-container').style.cursor = mode === 'DISPATCHER' ? 'crosshair' : 'grab';
 }
 
@@ -170,7 +172,6 @@ const handleMapClick = (e) => {
 
   if (tempMarker) map.value.removeLayer(tempMarker)
 
-  // 🚨 ZMIENIONA LINIJKA: Używamy customowej ikony zamiast domyślnej z Leaflet!
   tempMarker = L.marker([e.latlng.lat, e.latlng.lng], {
     icon: getCustomIcon('Intervention'),
     opacity: 0.5
@@ -184,7 +185,6 @@ const cancelNewReport = () => {
   if (tempMarker) map.value.removeLayer(tempMarker)
 }
 
-// 1. Zmodyfikowana funkcja wysyłania zgłoszenia
 const submitNewReport = async () => {
   try {
     const payload = {
@@ -192,13 +192,11 @@ const submitNewReport = async () => {
       longitude: newReportData.value.longitude
     };
 
-    // 🚨 NOWOŚĆ: Pobieramy token z pamięci przeglądarki i dodajemy do nagłówka
     const token = localStorage.getItem('jwt_token');
     const config = {
       headers: { Authorization: `Bearer ${token}` }
     };
 
-    // Dodajemy config jako trzeci parametr
     const response = await axios.post('http://localhost:8080/api/interventions', payload, config);
     const savedReport = response.data;
 
@@ -220,10 +218,8 @@ const submitNewReport = async () => {
   }
 }
 
-// 2. Zmodyfikowana funkcja pobierania zgłoszeń
 const fetchInterventions = async () => {
   try {
-    // 🚨 NOWOŚĆ: Tutaj też musimy wysłać token!
     const token = localStorage.getItem('jwt_token');
     const config = {
       headers: { Authorization: `Bearer ${token}` }
@@ -251,18 +247,12 @@ const focusMap = (lat, lng) => {
 
 const generateRoute = (fitBounds = true) => {
   if (routeLine.value) map.value.removeLayer(routeLine.value);
-
-  // 1. Zaczynamy od lokalizacji kierowcy
   let currentPos = [driverLocation.value.lat, driverLocation.value.lng];
   let unvisited = [...interventions.value.filter(inv => inv.latitude && inv.longitude)];
   let path = [currentPos];
-
-  // 2. Algorytm Nearest Neighbor
   while (unvisited.length > 0) {
     let nearestIndex = -1;
     let minDistance = Infinity;
-
-    // Szukamy najbliższego punktu
     for (let i = 0; i < unvisited.length; i++) {
       const point = unvisited[i];
       const dist = Math.sqrt(
@@ -275,17 +265,11 @@ const generateRoute = (fitBounds = true) => {
         nearestIndex = i;
       }
     }
-
-    // Dodajemy do trasy i ustawiamy jako nową pozycję
     const nextPoint = unvisited[nearestIndex];
     path.push([nextPoint.latitude, nextPoint.longitude]);
     currentPos = [nextPoint.latitude, nextPoint.longitude];
-
-    // Usuwamy odwiedzony
     unvisited.splice(nearestIndex, 1);
   }
-
-  // 3. Rysujemy linię
   if (path.length > 1) {
     routeLine.value = L.polyline(path, { color: '#D41B65', weight: 4, dashArray: '10, 10' }).addTo(map.value);
     if (fitBounds) {
@@ -309,21 +293,13 @@ const completeIntervention = async (id) => {
   try {
     const token = localStorage.getItem('jwt_token');
     const config = { headers: { Authorization: `Bearer ${token}` } };
-
-    // 1. Usuń z bazy danych
     await axios.delete(`http://localhost:8080/api/interventions/${id}`, config);
-
-    // 2. Usuń z listy UI
     interventions.value = interventions.value.filter(i => i.id !== id);
-
-    // 3. Usuń marker z mapy
     const markerObj = markers.value.find(m => m.id === id);
     if (markerObj) {
       map.value.removeLayer(markerObj.marker);
       markers.value = markers.value.filter(m => m.id !== id);
     }
-
-    // 4. Jeśli trasa jest włączona, przelicz ją na nowo po usunięciu
     if (isRouteGenerated.value) {
       generateRoute(false);
     }
@@ -335,7 +311,6 @@ const completeIntervention = async (id) => {
 </script>
 
 <style scoped>
-/* GŁÓWNY LAYOUT */
 .map-layout { display: flex; height: calc(100vh - 75px); margin: -2rem; background-color: #F8F9FB; }
 .sidebar { width: 380px; background-color: white; border-right: 1px solid #E5E7EB; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.02); z-index: 10; }
 .sidebar-header { padding: 1.5rem; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #E5E7EB; }
@@ -343,13 +318,11 @@ const completeIntervention = async (id) => {
 .heart-icon { width: 20px; height: 20px; color: white; }
 .text-primary { margin: 0; color: #D41B65; font-size: 1.25rem; font-weight: 600; }
 
-/* PRZEŁĄCZNIK TRYBÓW */
 .mode-toggle-container { padding: 1.5rem 1.5rem 0 1.5rem; }
 .mode-toggle { display: flex; background-color: #F3F4F6; border-radius: 8px; padding: 4px; }
 .mode-toggle button { flex: 1; padding: 0.5rem; border: none; background: transparent; border-radius: 6px; font-weight: 600; font-size: 0.9rem; color: #6B7280; cursor: pointer; transition: all 0.2s; }
 .mode-toggle button.active { background-color: white; color: #111827; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
-/* LISTA I KARTY */
 .reports-list { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
 .instruction-box { padding: 1rem; border-radius: 8px; font-size: 0.85rem; line-height: 1.4; transition: all 0.3s; }
 .instruction-box.dispatcher { background-color: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A; }
@@ -363,7 +336,6 @@ const completeIntervention = async (id) => {
 .location-text { margin: 0 0 1rem 0; font-size: 0.85rem; color: #6B7280; }
 .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #9CA3AF; border-top: 1px dashed #E5E7EB; padding-top: 0.75rem; }
 
-/* PRZYCISK COMPLETE DLA KIEROWCY */
 .complete-btn { background-color: #10B981; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
 .complete-btn:hover { background-color: #059669; transform: scale(1.05); }
 
@@ -371,14 +343,17 @@ const completeIntervention = async (id) => {
 .map-container { flex-grow: 1; position: relative; cursor: crosshair; }
 #leaflet-map { width: 100%; height: 100%; z-index: 1; }
 
-/* KONTROLKI MAPY */
 .routing-controls { position: absolute; bottom: 2rem; left: 2rem; z-index: 1000; }
 .route-btn { padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.15); transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
 .route-btn.generate { background-color: #111827; color: white; }
 .route-btn.generate:hover { background-color: #374151; transform: scale(1.02); }
 .route-btn.clear { background-color: white; color: #EF4444; border: 1px solid #EF4444; }
 
-/* MODAL */
+:deep(.custom-pin) {
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+}
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-card { background-color: white; padding: 2rem; border-radius: 12px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
 .modal-card h3 { margin: 0 0 0.5rem 0; font-size: 1.25rem; color: #111827; }
