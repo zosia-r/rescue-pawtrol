@@ -1,9 +1,11 @@
 package com.rescuepawtrol.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.rescuepawtrol.backend.model.enums.InterventionStatus;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "intervention")
@@ -24,4 +26,8 @@ public class Intervention {
     @ManyToOne
     @JoinColumn(name = "driver_id")
     private Employee driver;
+
+    @OneToMany(mappedBy = "intervention", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<RoutePoint> routePoints;
 }
