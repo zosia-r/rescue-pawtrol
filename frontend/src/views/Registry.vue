@@ -216,7 +216,7 @@
 
         <div class="form-group">
           <label>Date of Birth</label>
-          <input v-model="newAnimal.birthDate" type="date" class="input-field w-full">
+          <input v-model="newAnimal.birthDate" type="date" :max="today" class="input-field w-full">
         </div>
 
         <div class="modal-actions">
@@ -241,6 +241,7 @@ const showAddModal = ref(false)
 
 // Zmiana age: 0 na birthDate: ''
 const newAnimal = ref({ name: '', species: 'Dog', birthDate: '', status: 'Available' })
+const today = new Date().toISOString().split('T')[0]
 const newMedical = ref({})
 const newAdoptionStatus = ref({})
 
@@ -377,9 +378,13 @@ const toggleRow = async (id) => {
 const submitNewAnimal = async () => {
   if (!newAnimal.value.name) return alert("Please provide the animal's name!");
   if (!newAnimal.value.birthDate) return alert("Please select a birth date!");
+  
+  // Nowa walidacja daty z przyszłości
+  if (newAnimal.value.birthDate > today) {
+    return alert("Birth date cannot be in the future!");
+  }
 
   try {
-    // Wysyłamy birthDate zamiast age
     await axios.post('http://localhost:8080/api/animals', {
       name: newAnimal.value.name,
       species: newAnimal.value.species,
