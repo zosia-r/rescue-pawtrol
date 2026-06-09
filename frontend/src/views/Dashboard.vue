@@ -13,13 +13,6 @@
         </div>
       </div>
 
-      <div class="navbar-center">
-        <div class="search-bar">
-          <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search..." v-model="searchQuery">
-        </div>
-      </div>
-
       <div class="navbar-right">
         <button v-if="hasRole('DISPATCHER') || hasRole('MANAGER')"
                 class="nav-btn" :class="{ active: route.path === '/map' }" @click="router.push('/map')">Map</button>
