@@ -177,7 +177,7 @@
                   <div class="form-row">
                     <input type="text" v-model="newAdoptionStatus[animal.id].owner" placeholder="Owner" class="input-field flex-grow">
                     <input type="text" v-model="newAdoptionStatus[animal.id].notes" placeholder="Description (optional)" class="input-field flex-grow">
-                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animal.id)">Save</button>
+                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animalId)">Save</button>
                   </div>
                 </div>
               </div>
@@ -215,8 +215,8 @@
         </div>
 
         <div class="form-group">
-          <label>Age (years)</label>
-          <input v-model.number="newAnimal.age" type="number" min="0" placeholder="e.g., 2" class="input-field w-full">
+          <label>Date of Birth</label>
+          <input v-model="newAnimal.birthDate" type="date" class="input-field w-full">
         </div>
 
         <div class="modal-actions">
@@ -239,7 +239,8 @@ const medicalRecordTypes = ref([])
 const activeView = ref('registry')
 const showAddModal = ref(false)
 
-const newAnimal = ref({ name: '', species: 'Dog', age: 0, status: 'Available' })
+// Zmiana age: 0 na birthDate: ''
+const newAnimal = ref({ name: '', species: 'Dog', birthDate: '', status: 'Available' })
 const newMedical = ref({})
 const newAdoptionStatus = ref({})
 
@@ -252,17 +253,14 @@ const filters = ref({
 
 const filteredAnimals = computed(() => {
   return animals.value.filter(animal => {
-    // Widok podstawowy (Registry vs Archive)
     const matchesView = activeView.value === 'registry' 
       ? animal.status !== 'Finalized' 
       : animal.status === 'Finalized'
 
     if (!matchesView) return false
 
-    // Dynamiczne wyszukiwanie po imieniu (ignoruje wielkość liter)
     const matchesName = !filters.value.name || animal.name.toLowerCase().includes(filters.value.name.toLowerCase())
 
-    // Reaktywna filtracja po gatunku
     let matchesSpecies = true
     if (filters.value.species === 'Other') {
       matchesSpecies = animal.species !== 'Dog' && animal.species !== 'Cat'
@@ -270,10 +268,7 @@ const filteredAnimals = computed(() => {
       matchesSpecies = animal.species === filters.value.species
     }
 
-    // Filtracja po wieku
     const matchesAge = filters.value.maxAge === null || filters.value.maxAge === '' || animal.age <= filters.value.maxAge
-
-    // Filtracja po statusie adopcji
     const matchesStatus = activeView.value === 'archive' || !filters.value.status || animal.status === filters.value.status
 
     return matchesName && matchesSpecies && matchesAge && matchesStatus
@@ -321,7 +316,7 @@ const fetchAnimals = async () => {
         photo: animal.species === 'Cat' ? '🐱' : (animal.species === 'Dog' ? '🐕' : '🐾'),
         name: animal.name,
         species: animal.species,
-        age: animal.age ?? 0,
+        age: animal.age ?? 0, // dynamiczny age pobierany z getAge() z backendu
         kennel: animal.kennel ? animal.kennel.code : '-',
         status: animal.adoptionStatus,
         date: new Date().toISOString().split('T')[0],
@@ -381,19 +376,20 @@ const toggleRow = async (id) => {
 
 const submitNewAnimal = async () => {
   if (!newAnimal.value.name) return alert("Please provide the animal's name!");
-  if (newAnimal.value.age < 0) return alert("Age cannot be negative!");
+  if (!newAnimal.value.birthDate) return alert("Please select a birth date!");
 
   try {
+    // Wysyłamy birthDate zamiast age
     await axios.post('http://localhost:8080/api/animals', {
       name: newAnimal.value.name,
       species: newAnimal.value.species,
-      age: newAnimal.value.age,
+      birthDate: newAnimal.value.birthDate,
       adoptionStatus: newAnimal.value.status,
       isQuarantined: false
     })
 
     showAddModal.value = false;
-    newAnimal.value = { name: '', species: 'Dog', age: 0, status: 'Available' };
+    newAnimal.value = { name: '', species: 'Dog', birthDate: '', status: 'Available' };
     await fetchAnimals();
   } catch (error) {
     console.error("Error adding animal:", error)
@@ -587,7 +583,7 @@ onActivated(() => {
 .filters-card { background-color: #FFFFFF; border-radius: 12px; border: 1px solid #E5E7EB; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01); }
 .filters-row { display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap; }
 .filter-group { display: flex; flex-direction: column; gap: 0.5rem; flex-grow: 1; max-width: 220px; }
-.search-group { max-width: 280px; } /* Szerszy kontener dla wyszukiwarki */
+.search-group { max-width: 280px; }
 .filter-group label { font-size: 0.8rem; font-weight: 600; color: #4B5563; text-transform: uppercase; letter-spacing: 0.05em; }
 .filter-group .input-field { width: 100%; box-sizing: border-box; height: 38px; }
 .reset-btn { height: 38px; padding: 0 1.25rem; display: flex; align-items: center; justify-content: center; background-color: #F3F4F6; border-color: #D1D5DB; }
