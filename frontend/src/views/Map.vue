@@ -21,7 +21,7 @@
             🎧 <strong>Dispatcher:</strong> Click anywhere on the map to dispatch a unit.
           </p>
           <p v-else>
-            🚓 <strong>Driver:</strong> Drag the police car to simulate movement. Mark incidents as completed.
+            🚓 <strong>Driver:</strong> Live GPS tracking is active. Mark incidents as completed.
           </p>
         </div>
 
@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -96,31 +96,47 @@ const newReportData = ref({ latitude: 0, longitude: 0 })
 const driverLocation = ref({ lat: 51.105000, lng: 17.035000 })
 let driverMarker = null
 
+let trackingInterval = null
+let animationInterval = null
+const routeCoordsArray = ref([])
+
+// Kluczowa technika: className: '' usuwa wszystkie domyślne klasy Leafleta
+// (leaflet-marker-icon, leaflet-zoom-animated itp.), które mogą interferować
+// z pozycjonowaniem. Pozycjonowanie realizowane jest przez CSS transform
+// bezpośrednio na elemencie SVG — jest to niezależne od iconAnchor i marginesów
+// Leafleta, przez co działa identycznie dla markerów dodanych w dowolnym momencie.
 const getCustomIcon = (type) => {
   const color = type === 'Base' ? '#111827' : '#EF4444';
-
-  const svgIcon = `
-    <svg style="display: block; width: 36px; height: 36px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${color}">
+  // transform: translate(-50%, -100%) przesuwa element tak, żeby
+  // dolny środek SVG (czubek pinezki) był dokładnie na współrzędnych markera.
+  const svgHtml = `
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width="36"
+      height="36"
+      fill="${color}"
+      style="display:block; position:absolute; transform:translate(-50%, -100%); top:0; left:0; overflow:visible;"
+    >
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
       <circle cx="12" cy="9" r="2.5" fill="white"/>
-    </svg>
-  `;
-
+    </svg>`;
   return L.divIcon({
-    className: 'custom-pin',
-    html: svgIcon,
-    iconSize: [36, 36],
-    iconAnchor: [18, 33],
-    popupAnchor: [0, -33]
-  })
+    className: '',
+    html: svgHtml,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+    popupAnchor: [0, -36]
+  });
 }
 
 const getDriverIcon = () => {
+  // Ta sama technika dla ikony kierowcy: transform centruje element względem punktu markera
   return L.divIcon({
-    className: 'driver-pin',
-    html: `<div style="font-size: 32px; background: white; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid #D41B65;">🚓</div>`,
-    iconSize: [44, 44],
-    iconAnchor: [22, 22]
+    className: '',
+    html: `<div style="font-size:32px; background:white; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,0.3); border:2px solid #D41B65; position:absolute; transform:translate(-50%,-50%); top:0; left:0;">🚓</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0]
   })
 }
 
@@ -142,26 +158,46 @@ const initMap = () => {
 
   driverMarker = L.marker([driverLocation.value.lat, driverLocation.value.lng], {
     icon: getDriverIcon(),
-    draggable: true,
+    draggable: false,
     zIndexOffset: 1000
   }).addTo(map.value)
 
-  driverMarker.bindPopup('<b>🚓 Driver Unit 1</b><br>Drag me to move!')
+  driverMarker.bindPopup('<b>🚓 Driver Unit 1</b><br>Live GPS Tracking Active')
 
-  driverMarker.on('drag', (e) => {
-    driverLocation.value.lat = e.latlng.lat;
-    driverLocation.value.lng = e.latlng.lng;
-
-    if (isRouteGenerated.value) {
-      generateRoute(false)
-    }
-  })
   map.value.on('click', handleMapClick)
+}
+
+const startLiveTracking = () => {
+  if (trackingInterval) return;
+
+  trackingInterval = setInterval(async () => {
+    try {
+      const token = localStorage.getItem('jwt_token');
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.get('http://localhost:8080/api/tracking/unit1', config);
+
+      driverLocation.value.lat = response.data.latitude;
+      driverLocation.value.lng = response.data.longitude;
+
+      if (driverMarker) {
+        driverMarker.setLatLng([driverLocation.value.lat, driverLocation.value.lng]);
+      }
+    } catch (error) {
+      console.error("Błąd pobierania pozycji API:", error);
+    }
+  }, 3000);
+}
+
+const stopLiveTracking = () => {
+  if (trackingInterval) {
+    clearInterval(trackingInterval);
+    trackingInterval = null;
+  }
 }
 
 const setMode = (mode) => {
   appMode.value = mode;
-  document.querySelector('.map-container').style.cursor = mode === 'DISPATCHER' ? 'crosshair' : 'grab';
+  document.querySelector('.map-container').style.cursor = mode === 'DISPATCHER' ? 'crosshair' : 'default';
 }
 
 const handleMapClick = (e) => {
@@ -193,9 +229,7 @@ const submitNewReport = async () => {
     };
 
     const token = localStorage.getItem('jwt_token');
-    const config = {
-      headers: { Authorization: `Bearer ${token}` }
-    };
+    const config = { headers: { Authorization: `Bearer ${token}` } };
 
     const response = await axios.post('http://localhost:8080/api/interventions', payload, config);
     const savedReport = response.data;
@@ -221,9 +255,7 @@ const submitNewReport = async () => {
 const fetchInterventions = async () => {
   try {
     const token = localStorage.getItem('jwt_token');
-    const config = {
-      headers: { Authorization: `Bearer ${token}` }
-    };
+    const config = { headers: { Authorization: `Bearer ${token}` } };
 
     const response = await axios.get('http://localhost:8080/api/interventions', config)
     interventions.value = response.data
@@ -245,48 +277,107 @@ const focusMap = (lat, lng) => {
   if (lat && lng) map.value.flyTo([lat, lng], 16, { duration: 1.5 })
 }
 
-const generateRoute = (fitBounds = true) => {
+const generateRoute = async (fitBounds = true) => {
   if (routeLine.value) map.value.removeLayer(routeLine.value);
-  let currentPos = [driverLocation.value.lat, driverLocation.value.lng];
-  let unvisited = [...interventions.value.filter(inv => inv.latitude && inv.longitude)];
-  let path = [currentPos];
-  while (unvisited.length > 0) {
-    let nearestIndex = -1;
-    let minDistance = Infinity;
-    for (let i = 0; i < unvisited.length; i++) {
-      const point = unvisited[i];
-      const dist = Math.sqrt(
-          Math.pow(point.latitude - currentPos[0], 2) +
-          Math.pow(point.longitude - currentPos[1], 2)
-      );
 
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestIndex = i;
+  stopLiveTracking();
+  if (animationInterval) clearInterval(animationInterval);
+
+  const allPoints = [
+    [driverLocation.value.lat, driverLocation.value.lng],
+    ...interventions.value.filter(inv => inv.latitude && inv.longitude).map(inv => [inv.latitude, inv.longitude])
+  ];
+
+  if (allPoints.length > 1) {
+    try {
+      const coordsString = allPoints.map(p => `${p[1]},${p[0]}`).join(';');
+      const url = `https://router.project-osrm.org/trip/v1/driving/${coordsString}?source=first&roundtrip=false&overview=full&geometries=geojson`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data && data.trips && data.trips.length > 0) {
+        const osrmCoords = data.trips[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+        routeLine.value = L.polyline(osrmCoords, { color: '#D41B65', weight: 4, opacity: 0.8 }).addTo(map.value);
+
+        if (fitBounds) map.value.fitBounds(routeLine.value.getBounds(), { padding: [50, 50] });
+
+        isRouteGenerated.value = true;
+        routeCoordsArray.value = osrmCoords;
+        animateCarAlongRoute();
       }
+    } catch (error) {
+      console.warn("Błąd serwera drogowego OSRM. Rysuję trasę awaryjną w linii prostej!", error);
+
+      routeLine.value = L.polyline(allPoints, { color: '#D41B65', weight: 4, dashArray: '10, 10' }).addTo(map.value);
+      if (fitBounds) map.value.fitBounds(routeLine.value.getBounds(), { padding: [50, 50] });
+
+      isRouteGenerated.value = true;
+      routeCoordsArray.value = allPoints;
+      animateCarAlongRoute();
     }
-    const nextPoint = unvisited[nearestIndex];
-    path.push([nextPoint.latitude, nextPoint.longitude]);
-    currentPos = [nextPoint.latitude, nextPoint.longitude];
-    unvisited.splice(nearestIndex, 1);
+  } else {
+    startLiveTracking();
   }
-  if (path.length > 1) {
-    routeLine.value = L.polyline(path, { color: '#D41B65', weight: 4, dashArray: '10, 10' }).addTo(map.value);
-    if (fitBounds) {
-      map.value.fitBounds(routeLine.value.getBounds(), { padding: [50, 50] });
+};
+
+const animateCarAlongRoute = () => {
+  if (routeCoordsArray.value.length < 2) return;
+
+  let currentTargetIndex = 1;
+  const SPEED = 0.000015;
+
+  animationInterval = setInterval(() => {
+    const targetLat = routeCoordsArray.value[currentTargetIndex][0];
+    const targetLng = routeCoordsArray.value[currentTargetIndex][1];
+
+    const dLat = targetLat - driverLocation.value.lat;
+    const dLng = targetLng - driverLocation.value.lng;
+    const distance = Math.sqrt(dLat * dLat + dLng * dLng);
+
+    if (distance < SPEED) {
+      driverLocation.value.lat = targetLat;
+      driverLocation.value.lng = targetLng;
+      currentTargetIndex++;
+
+      if (currentTargetIndex >= routeCoordsArray.value.length) {
+        clearInterval(animationInterval);
+        clearRoute();
+        return;
+      }
+    } else {
+      const ratio = SPEED / distance;
+      driverLocation.value.lat += dLat * ratio;
+      driverLocation.value.lng += dLng * ratio;
     }
-    isRouteGenerated.value = true;
-  }
+
+    if (driverMarker) {
+      driverMarker.setLatLng([driverLocation.value.lat, driverLocation.value.lng]);
+    }
+  }, 50);
 };
 
 const clearRoute = () => {
   if (routeLine.value) map.value.removeLayer(routeLine.value)
+  if (animationInterval) {
+    clearInterval(animationInterval)
+    animationInterval = null;
+  }
   isRouteGenerated.value = false
+
+  startLiveTracking();
 }
 
 onMounted(() => {
   initMap()
   fetchInterventions()
+  startLiveTracking()
+})
+
+onBeforeUnmount(() => {
+  if (animationInterval) clearInterval(animationInterval)
+  if (trackingInterval) clearInterval(trackingInterval)
 })
 
 const completeIntervention = async (id) => {
@@ -349,11 +440,8 @@ const completeIntervention = async (id) => {
 .route-btn.generate:hover { background-color: #374151; transform: scale(1.02); }
 .route-btn.clear { background-color: white; color: #EF4444; border: 1px solid #EF4444; }
 
-:deep(.custom-pin) {
-  background: transparent !important;
-  border: none !important;
-  margin: 0 !important;
-}
+/* Ikony markerów używają className: '' — brak dodatkowych override CSS potrzebnych */
+
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-card { background-color: white; padding: 2rem; border-radius: 12px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
 .modal-card h3 { margin: 0 0 0.5rem 0; font-size: 1.25rem; color: #111827; }
