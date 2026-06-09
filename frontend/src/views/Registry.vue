@@ -6,16 +6,53 @@
         <div class="view-tabs">
           <button 
             :class="['tab-btn', { 'active': activeView === 'registry' }]" 
-            @click="activeView = 'registry'">
+            @click="handleViewChange('registry')">
             Registry
           </button>
           <button 
             :class="['tab-btn', { 'active': activeView === 'archive' }]" 
-            @click="activeView = 'archive'">
+            @click="handleViewChange('archive')">
             Archive
           </button>
         </div>
         <button class="primary-btn" v-if="activeView === 'registry'" @click="showAddModal = true">+ Add Animal</button>
+      </div>
+    </div>
+
+    <div class="filters-card">
+      <div class="filters-row">
+        <div class="filter-group search-group">
+          <label>Search by name</label>
+          <input type="text" v-model="filters.name" placeholder="Type animal name..." class="input-field">
+        </div>
+
+        <div class="filter-group">
+          <label>Species</label>
+          <select v-model="filters.species" class="input-field">
+            <option value="">All Species</option>
+            <option value="Dog">Dog</option>
+            <option value="Cat">Cat</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Max Age (years)</label>
+          <input type="number" v-model.number="filters.maxAge" placeholder="e.g. 5" min="0" class="input-field">
+        </div>
+
+        <div v-if="activeView === 'registry'" class="filter-group">
+          <label>Adoption Status</label>
+          <select v-model="filters.status" class="input-field">
+            <option value="">All Statuses</option>
+            <option value="Available">Available</option>
+            <option value="Pending">Pending</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Adopted">Adopted</option>
+          </select>
+        </div>
+
+        <button class="secondary-btn reset-btn" @click="resetFilters">Clear Filters</button>
       </div>
     </div>
 
@@ -27,6 +64,7 @@
           <th>Photo</th>
           <th>Name</th>
           <th>Species</th>
+          <th>Age</th>
           <th>Kennel</th>
           <th>Adoption Status</th>
           <th>Admission Date</th>
@@ -42,6 +80,7 @@
             <td><div class="avatar">{{ animal.photo }}</div></td>
             <td class="font-medium">{{ animal.name }}</td>
             <td class="text-gray">{{ animal.species }}</td>
+            <td>{{ animal.age }} {{ animal.age === 1 ? 'year' : 'years' }}</td>
             <td><span class="kennel-badge">{{ animal.kennel }}</span></td>
             <td>
                 <span :class="['status-badge', getStatusClass(animal.status)]">
@@ -52,9 +91,8 @@
           </tr>
 
           <tr v-if="expandedRows.includes(animal.id)" class="details-row">
-            <td colspan="7" class="details-cell">
+            <td colspan="8" class="details-cell">
               
-              <!-- Medical History Section -->
               <div class="medical-history-container">
                 <div class="history-header">
                   <span class="history-icon">🩺</span> <h3>Medical History ({{ animal.name }})</h3>
@@ -96,7 +134,6 @@
                 </div>
               </div>
 
-              <!-- Adoption History Section -->
               <div class="adoption-history-container">
                 <div class="history-header">
                   <span class="history-icon">📋</span> <h3>Adoption Status History ({{ animal.name }})</h3>
@@ -145,7 +182,6 @@
                 </div>
               </div>
 
-              <!-- Archive Actions -->
               <div v-if="activeView === 'archive'" class="restore-button-container">
                 <button class="restore-btn-large" @click="restoreAnimal(animal.id)">↩️ Restore from Archive</button>
               </div>
@@ -153,11 +189,13 @@
             </td>
           </tr>
         </template>
+        <tr v-if="filteredAnimals.length === 0">
+          <td colspan="8" class="text-gray" style="text-align: center; padding: 3rem;">No animals match the selected filters.</td>
+        </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Add Animal Modal -->
     <div v-if="showAddModal" class="modal-overlay">
       <div class="modal-card">
         <h3>New Animal Registration</h3>
@@ -174,6 +212,11 @@
             <option value="Cat">Cat</option>
             <option value="Other">Other</option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label>Age (years)</label>
+          <input v-model.number="newAnimal.age" type="number" min="0" placeholder="e.g., 2" class="input-field w-full">
         </div>
 
         <div class="modal-actions">
@@ -196,22 +239,59 @@ const medicalRecordTypes = ref([])
 const activeView = ref('registry')
 const showAddModal = ref(false)
 
-const newAnimal = ref({ name: '', species: 'Dog', status: 'Available' })
+const newAnimal = ref({ name: '', species: 'Dog', age: 0, status: 'Available' })
 const newMedical = ref({})
 const newAdoptionStatus = ref({})
 
-const filteredAnimals = computed(() => {
-  if (activeView.value === 'registry') {
-    return animals.value.filter(a => a.status !== 'Finalized')
-  } else {
-    return animals.value.filter(a => a.status === 'Finalized')
-  }
+const filters = ref({
+  name: '',
+  species: '',
+  maxAge: null,
+  status: ''
 })
+
+const filteredAnimals = computed(() => {
+  return animals.value.filter(animal => {
+    // Widok podstawowy (Registry vs Archive)
+    const matchesView = activeView.value === 'registry' 
+      ? animal.status !== 'Finalized' 
+      : animal.status === 'Finalized'
+
+    if (!matchesView) return false
+
+    // Dynamiczne wyszukiwanie po imieniu (ignoruje wielkość liter)
+    const matchesName = !filters.value.name || animal.name.toLowerCase().includes(filters.value.name.toLowerCase())
+
+    // Reaktywna filtracja po gatunku
+    let matchesSpecies = true
+    if (filters.value.species === 'Other') {
+      matchesSpecies = animal.species !== 'Dog' && animal.species !== 'Cat'
+    } else if (filters.value.species) {
+      matchesSpecies = animal.species === filters.value.species
+    }
+
+    // Filtracja po wieku
+    const matchesAge = filters.value.maxAge === null || filters.value.maxAge === '' || animal.age <= filters.value.maxAge
+
+    // Filtracja po statusie adopcji
+    const matchesStatus = activeView.value === 'archive' || !filters.value.status || animal.status === filters.value.status
+
+    return matchesName && matchesSpecies && matchesAge && matchesStatus
+  })
+})
+
+const handleViewChange = (view) => {
+  activeView.value = view
+  resetFilters()
+}
+
+const resetFilters = () => {
+  filters.value = { name: '', species: '', maxAge: null, status: '' }
+}
 
 const fetchMedicalRecordTypes = async () => {
   try {
     const response = await axios.get('http://localhost:8080/api/medical-records/types')
-
     medicalRecordTypes.value = response.data
 
     animals.value.forEach(animal => {
@@ -241,6 +321,7 @@ const fetchAnimals = async () => {
         photo: animal.species === 'Cat' ? '🐱' : (animal.species === 'Dog' ? '🐕' : '🐾'),
         name: animal.name,
         species: animal.species,
+        age: animal.age ?? 0,
         kennel: animal.kennel ? animal.kennel.code : '-',
         status: animal.adoptionStatus,
         date: new Date().toISOString().split('T')[0],
@@ -269,7 +350,6 @@ const toggleRow = async (id) => {
     if (animal && animal.medicalHistory.length === 0) {
       try {
         const response = await axios.get(`http://localhost:8080/api/medical-records/animal/${id}`)
-
         animal.medicalHistory = response.data.map(record => ({
           date: record.recordDate,
           type: record.recordType,
@@ -284,11 +364,10 @@ const toggleRow = async (id) => {
     if (animal && animal.adoptionStatusHistory.length === 1) {
       try {
         const response = await axios.get(`http://localhost:8080/api/adoption-status-history/animal/${id}`)
-
         animal.adoptionStatusHistory = response.data.map(record => ({
           date: record.date,
           status: record.status,
-          owner: record.owner || record.potentialOwner, // Ochrona w razie gdyby API zwracało starą nazwę
+          owner: record.owner || record.potentialOwner,
           notes: record.notes
         }))
       } catch (error) {
@@ -302,19 +381,20 @@ const toggleRow = async (id) => {
 
 const submitNewAnimal = async () => {
   if (!newAnimal.value.name) return alert("Please provide the animal's name!");
+  if (newAnimal.value.age < 0) return alert("Age cannot be negative!");
 
   try {
     await axios.post('http://localhost:8080/api/animals', {
       name: newAnimal.value.name,
       species: newAnimal.value.species,
+      age: newAnimal.value.age,
       adoptionStatus: newAnimal.value.status,
       isQuarantined: false
     })
 
     showAddModal.value = false;
-    newAnimal.value = { name: '', species: 'Dog', status: 'Available' };
+    newAnimal.value = { name: '', species: 'Dog', age: 0, status: 'Available' };
     await fetchAnimals();
-
   } catch (error) {
     console.error("Error adding animal:", error)
     alert("An error occurred while adding the animal.");
@@ -345,7 +425,6 @@ const submitMedicalRecord = async (animalId) => {
     });
 
     newMedical.value[animalId] = { type: '', description: '', vet: '' };
-
   } catch (error) {
     console.error("Error saving medical record:", error)
     alert("Error saving record. Make sure the event type matches your Java Enum.");
@@ -354,7 +433,6 @@ const submitMedicalRecord = async (animalId) => {
 
 const submitAdoptionStatusChange = async (animalId) => {
   const recordData = newAdoptionStatus.value[animalId];
-  // Wymuszenie pola owner
   if (!recordData.date || !recordData.status || !recordData.owner) return alert("Please fill in the date, status, and owner!");
 
   try {
@@ -385,7 +463,6 @@ const submitAdoptionStatusChange = async (animalId) => {
     }
 
     newAdoptionStatus.value[animalId] = { date: new Date().toISOString().split('T')[0], status: '', owner: '', notes: '' };
-
   } catch (error) {
     console.error("Error saving adoption status change:", error)
     alert("An error occurred while saving the adoption status change.");
@@ -413,7 +490,6 @@ const restoreAnimal = async (animalId) => {
         notes: 'Restored from archive'
       })
     }
-
   } catch (error) {
     console.error("Error restoring animal:", error)
     alert("An error occurred while restoring the animal.");
@@ -488,10 +564,7 @@ onActivated(() => {
 .secondary-btn { background-color: #F3F4F6; color: #4B5563; border: 1px solid #E5E7EB; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; cursor: pointer; }
 .secondary-btn:hover { background-color: #E5E7EB; }
 .cancel-btn { background-color: transparent; color: #6B7280; border: none; font-weight: 500; cursor: pointer; padding: 0.6rem 1.2rem; }
-.action-btn { background-color: transparent; border: none; font-size: 1rem; cursor: pointer; padding: 0.25rem 0.5rem; }
-.action-btn:hover { opacity: 0.7; }
-.restore-btn { background-color: #D1FAE5; color: #065F46; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 0.85rem; }
-.restore-btn:hover { background-color: #A7F3D0; }
+
 .restore-button-container { margin: 1rem; padding: 1.5rem; background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; text-align: center; }
 .restore-btn-large { background-color: #D1FAE5; color: #065F46; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 1rem; }
 .restore-btn-large:hover { background-color: #A7F3D0; }
@@ -509,4 +582,14 @@ onActivated(() => {
 .form-group { margin-bottom: 1.25rem; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 500; color: #4B5563; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+
+/* Style Filtrowania */
+.filters-card { background-color: #FFFFFF; border-radius: 12px; border: 1px solid #E5E7EB; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01); }
+.filters-row { display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap; }
+.filter-group { display: flex; flex-direction: column; gap: 0.5rem; flex-grow: 1; max-width: 220px; }
+.search-group { max-width: 280px; } /* Szerszy kontener dla wyszukiwarki */
+.filter-group label { font-size: 0.8rem; font-weight: 600; color: #4B5563; text-transform: uppercase; letter-spacing: 0.05em; }
+.filter-group .input-field { width: 100%; box-sizing: border-box; height: 38px; }
+.reset-btn { height: 38px; padding: 0 1.25rem; display: flex; align-items: center; justify-content: center; background-color: #F3F4F6; border-color: #D1D5DB; }
+.reset-btn:hover { background-color: #E5E7EB; }
 </style>

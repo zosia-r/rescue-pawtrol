@@ -14,7 +14,7 @@ public class AdoptionStatusHistory {
 
     private LocalDate date;
     private String status;
-    private String potentialOwner;
+    private String owner;
     private String notes;
 
     @ManyToOne
