@@ -1,5 +1,9 @@
 {
   "dependencies": {
-    "keycloak-js": "^26.2.4"
+    "chart.js": "^4.5.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "keycloak-js": "^26.2.4",
+    "vue-chartjs": "^5.3.3"
   }
 }

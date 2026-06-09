@@ -11,8 +11,5 @@ import java.util.List;
 @Repository
 public interface InterventionRepository extends JpaRepository<Intervention, Long> {
 
-    @Query("SELECT FUNCTION('date', i.reportTime), COUNT(i) FROM Intervention i " +
-            "WHERE i.reportTime >= :start AND i.reportTime <= :end " +
-            "GROUP BY FUNCTION('date', i.reportTime) ORDER BY FUNCTION('date', i.reportTime) ASC")
-    List<Object[]> countByDateRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    List<Intervention> findAllByReportTimeBetween(LocalDateTime start, LocalDateTime end);
 }
