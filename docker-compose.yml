@@ -5,10 +5,15 @@ services:
       POSTGRES_DB: rescue_pawtrol
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password123
+      # Skrypt, który przy pierwszym uruchomieniu automatycznie stworzy bazę 'keycloak'
+      # obok Twojej głównej bazy 'rescue_pawtrol'
+      POSTGRES_MULTIPLE_DATABASES: keycloak
     ports:
       - "5434:5432"
     volumes:
       - fresh_postgres_data:/var/lib/postgresql/data
+      # Podpięcie skryptu inicjalizującego do kontenera Postgresa
+      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d rescue_pawtrol"]
       interval: 10s
@@ -45,10 +50,19 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      # KONFIGURACJA POŁĄCZENIA Z POSTGRES:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: admin
+      KC_DB_PASSWORD: password123
     ports:
       - "8081:8080"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+      - ./keycloak/themes:/opt/keycloak/themes
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   fresh_postgres_data:

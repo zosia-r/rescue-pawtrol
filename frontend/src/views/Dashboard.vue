@@ -58,7 +58,7 @@ const hasRole = (roleName) => {
 
 const handleLogout = () => {
   localStorage.removeItem('jwt_token')
-  keycloak.logout({ redirectUri: 'http://localhost:5173' })
+  keycloak.logout({ redirectUri: 'http://localhost' })
 }
 
 const currentModuleName = computed(() => {
