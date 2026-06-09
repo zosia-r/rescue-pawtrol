@@ -172,6 +172,7 @@ public class DatabaseSeeder {
             if (interventionRepository.count() == 0 && driver != null) {
                 Intervention inv = new Intervention();
                 inv.setReportTime(LocalDateTime.now().minusHours(2));
+                inv.setDescription("Cat on a tree");
                 inv.setLatitude(51.107883);
                 inv.setLongitude(17.038538);
                 inv.setStatus(InterventionStatus.values()[0]);

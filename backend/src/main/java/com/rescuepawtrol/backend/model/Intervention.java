@@ -15,6 +15,9 @@ public class Intervention {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(length = 500)
+    private String description;
+
     private Double latitude;
     private Double longitude;
 
