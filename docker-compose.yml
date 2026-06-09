@@ -35,6 +35,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:8080/api/animals"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   frontend:
     build:
@@ -42,7 +48,14 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -63,6 +76,31 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Niezawodny test basha (sprawdza czy port 8080 wewnątrz kontenera jest otwarty)
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo 'open'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ready-notifier:
+    image: alpine:latest
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo '==================================================';
+        echo '   🚀 RESCUE PAWTROL IS READY TO WORK! 🚀';
+        echo '   Frontend: http://localhost';
+        echo '   Backend:  http://localhost:8080';
+        echo '   Keycloak: http://localhost:8081';
+        echo '==================================================';
+      "
 
 volumes:
   fresh_postgres_data:
