@@ -1,6 +1,7 @@
 package com.rescuepawtrol.backend.controller;
 
 import com.rescuepawtrol.backend.model.Animal;
+import com.rescuepawtrol.backend.model.AdoptionStatusHistory;
 import com.rescuepawtrol.backend.service.AnimalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -31,5 +32,12 @@ public class AnimalController {
     public Animal assignKennel(@PathVariable Long id,
                                @RequestBody Map<String, Long> body) {
         return animalService.assignKennel(id, body.get("kennelId"));
+    }
+
+    @PatchMapping("/{id}/adoption-status")
+    public Animal updateAdoptionStatus(@PathVariable Long id,
+                                       @RequestBody Map<String, String> body) {
+        String status = body.get("status");
+        return animalService.updateAdoptionStatus(id, status);
     }
 }

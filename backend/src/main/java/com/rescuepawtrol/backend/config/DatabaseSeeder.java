@@ -6,8 +6,8 @@ import com.rescuepawtrol.backend.repository.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import java.time.LocalDate;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -98,30 +98,30 @@ public class DatabaseSeeder {
             if (animalRepository.count() == 0) {
 
                 // Dogs (7)
-                Animal a1  = animal("Buddy",    "Dog",    3, "Available",  false);
-                Animal a2  = animal("Max",      "Dog",    5, "Available",  false);
-                Animal a3  = animal("Rocky",    "Dog",    2, "Pending",    false);
-                Animal a4  = animal("Charlie",  "Dog",    4, "Available",  false);
-                Animal a5  = animal("Duke",     "Dog",    6, "On Hold",    false);
-                Animal a6  = animal("Bella",    "Dog",    1, "Available",  false);
-                Animal a7  = animal("Rex",      "Dog",    7, "Available",  true);
+                Animal a1  = animal("Buddy",    "Dog",    LocalDate.now().minusYears(3), "Available",  false);
+                Animal a2  = animal("Max",      "Dog",    LocalDate.now().minusYears(5), "Available",  false);
+                Animal a3  = animal("Rocky",    "Dog",    LocalDate.now().minusYears(2), "Pending",    false);
+                Animal a4  = animal("Charlie",  "Dog",    LocalDate.now().minusYears(4), "Available",  false);
+                Animal a5  = animal("Duke",     "Dog",    LocalDate.now().minusYears(6), "On Hold",    false);
+                Animal a6  = animal("Bella",    "Dog",    LocalDate.now().minusYears(1), "Available",  false);
+                Animal a7  = animal("Rex",      "Dog",    LocalDate.now().minusYears(7), "Available",  true);
 
-                // Cats (7)
-                Animal a8  = animal("Whiskers", "Cat",    2, "Available",  false);
-                Animal a9  = animal("Luna",     "Cat",    1, "Pending",    false);
-                Animal a10 = animal("Mittens",  "Cat",    4, "Available",  false);
-                Animal a11 = animal("Shadow",   "Cat",    3, "On Hold",    false);
-                Animal a12 = animal("Cleo",     "Cat",    5, "Available",  false);
-                Animal a13 = animal("Nala",     "Cat",    2, "Available",  true);
-                Animal a14 = animal("Simba",    "Cat",    6, "Available",  false);
+// Cats (7)
+                Animal a8  = animal("Whiskers", "Cat",    LocalDate.now().minusYears(2), "Available",  false);
+                Animal a9  = animal("Luna",     "Cat",    LocalDate.now().minusYears(1), "Pending",    false);
+                Animal a10 = animal("Mittens",  "Cat",    LocalDate.now().minusYears(4), "Available",  false);
+                Animal a11 = animal("Shadow",   "Cat",    LocalDate.now().minusYears(3), "On Hold",    false);
+                Animal a12 = animal("Cleo",     "Cat",    LocalDate.now().minusYears(5), "Available",  false);
+                Animal a13 = animal("Nala",     "Cat",    LocalDate.now().minusYears(2), "Available",  true);
+                Animal a14 = animal("Simba",    "Cat",    LocalDate.now().minusYears(6), "Available",  false);
 
-                // Other (6)
-                Animal a15 = animal("Thumper",  "Rabbit", 2, "Available",  false);
-                Animal a16 = animal("Hazel",    "Rabbit", 1, "Pending",    false);
-                Animal a17 = animal("Tweety",   "Bird",   3, "Available",  false);
-                Animal a18 = animal("Polly",    "Bird",   4, "On Hold",    false);
-                Animal a19 = animal("Nibbles",  "Hamster",1, "Available",  false);
-                Animal a20 = animal("Patches",  "Rabbit", 2, "Available",  true);
+// Other (6)
+                Animal a15 = animal("Thumper",  "Rabbit", LocalDate.now().minusYears(2), "Available",  false);
+                Animal a16 = animal("Hazel",    "Rabbit", LocalDate.now().minusYears(1), "Pending",    false);
+                Animal a17 = animal("Tweety",   "Bird",   LocalDate.now().minusYears(3), "Available",  false);
+                Animal a18 = animal("Polly",    "Bird",   LocalDate.now().minusYears(4), "On Hold",    false);
+                Animal a19 = animal("Nibbles",  "Hamster",LocalDate.now().minusYears(1), "Available",  false);
+                Animal a20 = animal("Patches",  "Rabbit", LocalDate.now().minusYears(2), "Available",  true);
 
                 animalRepository.saveAll(List.of(
                         a1,  a2,  a3,  a4,  a5,  a6,  a7,
@@ -213,12 +213,12 @@ public class DatabaseSeeder {
         return k;
     }
 
-    private Animal animal(String name, String species, int age,
+    private Animal animal(String name, String species, LocalDate birthDate,
                           String adoptionStatus, boolean isQuarantined) {
         Animal a = new Animal();
         a.setName(name);
         a.setSpecies(species);
-        a.setAge(age);
+        a.setBirthDate(birthDate); // o tutaj
         a.setAdoptionStatus(adoptionStatus);
         a.setIsQuarantined(isQuarantined);
         // kennel celowo null — żadne zwierzę nie jest przypisane na start

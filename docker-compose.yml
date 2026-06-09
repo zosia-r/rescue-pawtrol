@@ -5,10 +5,15 @@ services:
       POSTGRES_DB: rescue_pawtrol
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password123
+      # Skrypt, który przy pierwszym uruchomieniu automatycznie stworzy bazę 'keycloak'
+      # obok Twojej głównej bazy 'rescue_pawtrol'
+      POSTGRES_MULTIPLE_DATABASES: keycloak
     ports:
       - "5434:5432"
     volumes:
       - fresh_postgres_data:/var/lib/postgresql/data
+      # Podpięcie skryptu inicjalizującego do kontenera Postgresa
+      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d rescue_pawtrol"]
       interval: 10s
@@ -30,6 +35,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:8080/api/animals"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   frontend:
     build:
@@ -37,7 +48,14 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:80"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -45,10 +63,44 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      # KONFIGURACJA POŁĄCZENIA Z POSTGRES:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_USERNAME: admin
+      KC_DB_PASSWORD: password123
     ports:
       - "8081:8080"
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm.json
+      - ./keycloak/themes:/opt/keycloak/themes
+    depends_on:
+      db:
+        condition: service_healthy
+    # Niezawodny test basha (sprawdza czy port 8080 wewnątrz kontenera jest otwarty)
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo 'open'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ready-notifier:
+    image: alpine:latest
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo '==================================================';
+        echo '   🚀 RESCUE PAWTROL IS READY TO WORK! 🚀';
+        echo '   Frontend: http://localhost';
+        echo '   Backend:  http://localhost:8080';
+        echo '   Keycloak: http://localhost:8081';
+        echo '==================================================';
+      "
 
 volumes:
   fresh_postgres_data:

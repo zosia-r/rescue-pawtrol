@@ -7,6 +7,9 @@ COPY src ./src
 RUN mvn -DskipTests package
 
 FROM eclipse-temurin:21-jre
+# DODANA LINIJKA: Instalacja curl na potrzeby Docker Healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
