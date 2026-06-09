@@ -1,9 +1,11 @@
 package com.rescuepawtrol.backend.controller;
 
 import com.rescuepawtrol.backend.model.MedicalRecord;
+import com.rescuepawtrol.backend.model.enums.MedicalRecordType;
 import com.rescuepawtrol.backend.service.MedicalRecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -16,6 +18,11 @@ public class MedicalRecordController {
     @GetMapping
     public List<MedicalRecord> getAllRecords() {
         return medicalRecordService.getAllRecords();
+    }
+
+    @GetMapping("/types")
+    public List<MedicalRecordType> getMedicalRecordTypes() {
+        return Arrays.asList(MedicalRecordType.values());
     }
 
     @GetMapping("/animal/{animalId}")

@@ -80,4 +80,13 @@ public class AnimalService {
             );
         }
     }
+
+    public Animal updateAdoptionStatus(Long animalId, String newStatus) {
+        Animal animal = animalRepository.findById(animalId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Animal not found: " + animalId));
+
+        animal.setAdoptionStatus(newStatus);
+        return animalRepository.save(animal);
+    }
 }

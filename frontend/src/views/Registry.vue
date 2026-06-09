@@ -1,8 +1,22 @@
 <template>
   <div class="registry-container">
     <div class="table-header">
-      <h2>Shelter Animals</h2>
-      <button class="primary-btn" @click="showAddModal = true">+ Add Animal</button>
+      <h2>{{ activeView === 'registry' ? 'Shelter Animals' : 'Archive' }}</h2>
+      <div class="header-right">
+        <div class="view-tabs">
+          <button 
+            :class="['tab-btn', { 'active': activeView === 'registry' }]" 
+            @click="activeView = 'registry'">
+            Registry
+          </button>
+          <button 
+            :class="['tab-btn', { 'active': activeView === 'archive' }]" 
+            @click="activeView = 'archive'">
+            Archive
+          </button>
+        </div>
+        <button class="primary-btn" v-if="activeView === 'registry'" @click="showAddModal = true">+ Add Animal</button>
+      </div>
     </div>
 
     <div class="registry-card">
@@ -19,7 +33,7 @@
         </tr>
         </thead>
         <tbody>
-        <template v-for="animal in animals" :key="animal.id">
+        <template v-for="animal in filteredAnimals" :key="animal.id">
 
           <tr class="animal-row" @click="toggleRow(animal.id)">
             <td class="expand-cell">
@@ -39,6 +53,8 @@
 
           <tr v-if="expandedRows.includes(animal.id)" class="details-row">
             <td colspan="7" class="details-cell">
+              
+              <!-- Medical History Section -->
               <div class="medical-history-container">
                 <div class="history-header">
                   <span class="history-icon">🩺</span> <h3>Medical History ({{ animal.name }})</h3>
@@ -66,17 +82,74 @@
                   </tbody>
                 </table>
 
-                <div class="add-record-form">
+                <div v-if="activeView === 'registry'" class="add-record-form">
                   <h4>+ Add New Record</h4>
                   <div class="form-row">
-                    <input type="text" v-model="newMedical[animal.id].type" placeholder="Type (e.g., VACCINATION)" class="input-field">
+                    <select v-model="newMedical[animal.id].type" class="input-field">
+                      <option value="" disabled>Select type</option>
+                      <option v-for="type in medicalRecordTypes" :key="type" :value="type">{{ type }}</option>
+                    </select>
                     <input type="text" v-model="newMedical[animal.id].description" placeholder="Procedure description..." class="input-field flex-grow">
                     <input type="text" v-model="newMedical[animal.id].vet" placeholder="Veterinarian" class="input-field">
                     <button class="secondary-btn" @click="submitMedicalRecord(animal.id)">Save</button>
                   </div>
                 </div>
-
               </div>
+
+              <!-- Adoption History Section -->
+              <div class="adoption-history-container">
+                <div class="history-header">
+                  <span class="history-icon">📋</span> <h3>Adoption Status History ({{ animal.name }})</h3>
+                </div>
+
+                <table class="adoption-table">
+                  <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Owner</th>
+                    <th>Description</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  <tr v-for="(record, index) in animal.adoptionStatusHistory" :key="index">
+                    <td>{{ record.date }}</td>
+                    <td><span :class="['status-badge', getStatusClass(record.status)]">{{ record.status }}</span></td>
+                    <td class="text-gray">{{ record.owner || '-' }}</td>
+                    <td class="text-gray">{{ record.notes || '-' }}</td>
+                  </tr>
+                  <tr v-if="!animal.adoptionStatusHistory || animal.adoptionStatusHistory.length === 0">
+                    <td colspan="4" class="text-gray" style="text-align: center; padding: 2rem;">No adoption status changes recorded.</td>
+                  </tr>
+                  </tbody>
+                </table>
+
+                <div v-if="activeView === 'registry'" class="add-record-form">
+                  <h4>+ Add Adoption Status Change</h4>
+                  <div class="form-row">
+                    <input type="date" v-model="newAdoptionStatus[animal.id].date" class="input-field">
+                    <select v-model="newAdoptionStatus[animal.id].status" class="input-field">
+                      <option value="" disabled>Select status</option>
+                      <option value="Available">Available</option>
+                      <option value="Pending">Pending</option>
+                      <option value="On Hold">On Hold</option>
+                      <option value="Adopted">Adopted</option>
+                      <option value="Finalized">Finalized</option>
+                    </select>
+                  </div>
+                  <div class="form-row">
+                    <input type="text" v-model="newAdoptionStatus[animal.id].owner" placeholder="Owner" class="input-field flex-grow">
+                    <input type="text" v-model="newAdoptionStatus[animal.id].notes" placeholder="Description (optional)" class="input-field flex-grow">
+                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animal.id)">Save</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Archive Actions -->
+              <div v-if="activeView === 'archive'" class="restore-button-container">
+                <button class="restore-btn-large" @click="restoreAnimal(animal.id)">↩️ Restore from Archive</button>
+              </div>
+
             </td>
           </tr>
         </template>
@@ -84,6 +157,7 @@
       </table>
     </div>
 
+    <!-- Add Animal Modal -->
     <div v-if="showAddModal" class="modal-overlay">
       <div class="modal-card">
         <h3>New Animal Registration</h3>
@@ -102,15 +176,6 @@
           </select>
         </div>
 
-        <div class="form-group">
-          <label>Adoption Status</label>
-          <select v-model="newAnimal.status" class="input-field w-full">
-            <option value="Available">Available</option>
-            <option value="Pending">Pending</option>
-            <option value="On Hold">On Hold</option>
-          </select>
-        </div>
-
         <div class="modal-actions">
           <button class="cancel-btn" @click="showAddModal = false">Cancel</button>
           <button class="primary-btn" @click="submitNewAnimal">Add Animal</button>
@@ -122,15 +187,42 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onActivated } from 'vue'
+import { ref, onMounted, onActivated, computed } from 'vue'
 import axios from 'axios'
 
 const expandedRows = ref([])
 const animals = ref([])
-
+const medicalRecordTypes = ref([])
+const activeView = ref('registry')
 const showAddModal = ref(false)
+
 const newAnimal = ref({ name: '', species: 'Dog', status: 'Available' })
 const newMedical = ref({})
+const newAdoptionStatus = ref({})
+
+const filteredAnimals = computed(() => {
+  if (activeView.value === 'registry') {
+    return animals.value.filter(a => a.status !== 'Finalized')
+  } else {
+    return animals.value.filter(a => a.status === 'Finalized')
+  }
+})
+
+const fetchMedicalRecordTypes = async () => {
+  try {
+    const response = await axios.get('http://localhost:8080/api/medical-records/types')
+
+    medicalRecordTypes.value = response.data
+
+    animals.value.forEach(animal => {
+      if (newMedical.value[animal.id] && !newMedical.value[animal.id].type) {
+        newMedical.value[animal.id].type = response.data[0] ?? ''
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching medical record types:', error)
+  }
+}
 
 const fetchAnimals = async () => {
   try {
@@ -138,7 +230,10 @@ const fetchAnimals = async () => {
 
     animals.value = response.data.map(animal => {
       if (!newMedical.value[animal.id]) {
-        newMedical.value[animal.id] = { type: '', description: '', vet: '' }
+        newMedical.value[animal.id] = { type: medicalRecordTypes.value[0] ?? '', description: '', vet: '' }
+      }
+      if (!newAdoptionStatus.value[animal.id]) {
+        newAdoptionStatus.value[animal.id] = { date: new Date().toISOString().split('T')[0], status: '', owner: '', notes: '' }
       }
 
       return {
@@ -149,7 +244,15 @@ const fetchAnimals = async () => {
         kennel: animal.kennel ? animal.kennel.code : '-',
         status: animal.adoptionStatus,
         date: new Date().toISOString().split('T')[0],
-        medicalHistory: []
+        medicalHistory: [],
+        adoptionStatusHistory: [
+          {
+            date: new Date().toISOString().split('T')[0],
+            status: animal.adoptionStatus,
+            owner: null,
+            notes: 'Initial status'
+          }
+        ]
       }
     })
   } catch (error) {
@@ -175,6 +278,21 @@ const toggleRow = async (id) => {
         }))
       } catch (error) {
         console.error("Error fetching medical records:", error)
+      }
+    }
+
+    if (animal && animal.adoptionStatusHistory.length === 1) {
+      try {
+        const response = await axios.get(`http://localhost:8080/api/adoption-status-history/animal/${id}`)
+
+        animal.adoptionStatusHistory = response.data.map(record => ({
+          date: record.date,
+          status: record.status,
+          owner: record.owner || record.potentialOwner, // Ochrona w razie gdyby API zwracało starą nazwę
+          notes: record.notes
+        }))
+      } catch (error) {
+        console.error("Error fetching adoption status history:", error)
       }
     }
   } else {
@@ -234,12 +352,73 @@ const submitMedicalRecord = async (animalId) => {
   }
 }
 
-onMounted(() => {
-  fetchAnimals()
-})
-onActivated(() => {
-  fetchAnimals()
-})
+const submitAdoptionStatusChange = async (animalId) => {
+  const recordData = newAdoptionStatus.value[animalId];
+  // Wymuszenie pola owner
+  if (!recordData.date || !recordData.status || !recordData.owner) return alert("Please fill in the date, status, and owner!");
+
+  try {
+    await axios.patch(`http://localhost:8080/api/animals/${animalId}/adoption-status`, {
+      status: recordData.status
+    })
+
+    await axios.post(`http://localhost:8080/api/adoption-status-history`, {
+      date: recordData.date,
+      status: recordData.status,
+      owner: recordData.owner,
+      notes: recordData.notes || null,
+      animal: { id: animalId }
+    })
+
+    const animal = animals.value.find(a => a.id === animalId);
+    if (animal) {
+      animal.status = recordData.status
+      if (!animal.adoptionStatusHistory) {
+        animal.adoptionStatusHistory = []
+      }
+      animal.adoptionStatusHistory.unshift({
+        date: recordData.date,
+        status: recordData.status,
+        owner: recordData.owner,
+        notes: recordData.notes || null
+      })
+    }
+
+    newAdoptionStatus.value[animalId] = { date: new Date().toISOString().split('T')[0], status: '', owner: '', notes: '' };
+
+  } catch (error) {
+    console.error("Error saving adoption status change:", error)
+    alert("An error occurred while saving the adoption status change.");
+  }
+}
+
+const restoreAnimal = async (animalId) => {
+  if (!confirm("Restore this animal to the registry?")) return;
+
+  try {
+    await axios.patch(`http://localhost:8080/api/animals/${animalId}/adoption-status`, {
+      status: 'Available'
+    })
+
+    const animal = animals.value.find(a => a.id === animalId);
+    if (animal) {
+      animal.status = 'Available'
+      if (!animal.adoptionStatusHistory) {
+        animal.adoptionStatusHistory = []
+      }
+      animal.adoptionStatusHistory.unshift({
+        date: new Date().toISOString().split('T')[0],
+        status: 'Available',
+        owner: null,
+        notes: 'Restored from archive'
+      })
+    }
+
+  } catch (error) {
+    console.error("Error restoring animal:", error)
+    alert("An error occurred while restoring the animal.");
+  }
+}
 
 const getStatusClass = (status) => {
   switch(status) {
@@ -247,13 +426,20 @@ const getStatusClass = (status) => {
     case 'Pending': return 'status-pending';
     case 'On Hold': return 'status-on-hold';
     case 'Adopted': return 'status-adopted';
+    case 'Finalized': return 'status-finalized';
     default: return '';
   }
 }
+
+onMounted(() => {
+  fetchMedicalRecordTypes().then(fetchAnimals)
+})
+onActivated(() => {
+  fetchMedicalRecordTypes().then(fetchAnimals)
+})
 </script>
 
 <style scoped>
-/* STARE STYLE BEZ ZMIAN */
 .registry-card { background-color: #FFFFFF; border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02); overflow: hidden; }
 .registry-table { width: 100%; border-collapse: collapse; text-align: left; }
 .registry-table th { padding: 1.25rem 1rem; font-size: 0.85rem; font-weight: 600; color: #374151; border-bottom: 1px solid #E5E7EB; }
@@ -272,9 +458,10 @@ const getStatusClass = (status) => {
 .status-pending { background-color: #FEF3C7; color: #92400E; }
 .status-on-hold { background-color: #F3F4F6; color: #4B5563; }
 .status-adopted { background-color: #DBEAFE; color: #1E40AF; }
+.status-finalized { background-color: #DDD6FE; color: #4F46E5; }
 .details-row td { padding: 0; border-bottom: 1px solid #E5E7EB; background-color: #FAFAFA; }
 .details-cell { padding-bottom: 1.5rem !important; }
-.medical-history-container { margin: 0 1rem 1rem 5rem; background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
+.medical-history-container { margin: 0 1rem 1rem 1rem; background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
 .history-header { display: flex; align-items: center; gap: 8px; padding: 1rem 1.5rem; border-bottom: 1px solid #F3F4F6; }
 .history-icon { color: #D41B65; font-size: 1.1rem; }
 .history-header h3 { margin: 0; font-size: 0.95rem; font-weight: 600; color: #374151; }
@@ -283,21 +470,39 @@ const getStatusClass = (status) => {
 .medical-table td { padding: 1rem 1.5rem; font-size: 0.9rem; color: #111827; border-bottom: 1px solid #F3F4F6; }
 .medical-table tr:last-child td { border-bottom: none; }
 .event-badge { background-color: #FDF2F8; color: #D41B65; padding: 0.25rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+.adoption-history-container { margin: 1rem 1rem 0 1rem; background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
+.adoption-table { width: 100%; border-collapse: collapse; text-align: left; }
+.adoption-table th { padding: 0.75rem 1.5rem; font-size: 0.8rem; font-weight: 600; color: #4B5563; background-color: #FFFFFF; border-bottom: 1px solid #F3F4F6; }
+.adoption-table td { padding: 1rem 1.5rem; font-size: 0.9rem; color: #111827; border-bottom: 1px solid #F3F4F6; }
+.adoption-table tr:last-child td { border-bottom: none; }
 
 .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .table-header h2 { margin: 0; font-size: 1.25rem; font-weight: 600; color: #111827; }
+.header-right { display: flex; gap: 1rem; align-items: center; }
+.view-tabs { display: flex; gap: 0.5rem; }
+.tab-btn { background-color: transparent; border: 1px solid #D1D5DB; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; cursor: pointer; color: #6B7280; transition: 0.2s; }
+.tab-btn.active { background-color: #D41B65; color: white; border-color: #D41B65; }
+.tab-btn:hover { border-color: #D41B65; }
 .primary-btn { background-color: #D41B65; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 500; cursor: pointer; transition: 0.2s; }
 .primary-btn:hover { background-color: #B01552; }
 .secondary-btn { background-color: #F3F4F6; color: #4B5563; border: 1px solid #E5E7EB; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; cursor: pointer; }
 .secondary-btn:hover { background-color: #E5E7EB; }
 .cancel-btn { background-color: transparent; color: #6B7280; border: none; font-weight: 500; cursor: pointer; padding: 0.6rem 1.2rem; }
+.action-btn { background-color: transparent; border: none; font-size: 1rem; cursor: pointer; padding: 0.25rem 0.5rem; }
+.action-btn:hover { opacity: 0.7; }
+.restore-btn { background-color: #D1FAE5; color: #065F46; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 0.85rem; }
+.restore-btn:hover { background-color: #A7F3D0; }
+.restore-button-container { margin: 1rem; padding: 1.5rem; background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; text-align: center; }
+.restore-btn-large { background-color: #D1FAE5; color: #065F46; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 1rem; }
+.restore-btn-large:hover { background-color: #A7F3D0; }
 .input-field { padding: 0.5rem 0.75rem; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 0.9rem; outline: none; }
 .input-field:focus { border-color: #D41B65; }
 .w-full { width: 100%; box-sizing: border-box; }
 .flex-grow { flex-grow: 1; }
 .add-record-form { padding: 1.5rem; background-color: #F9FAFB; border-top: 1px solid #E5E7EB; }
 .add-record-form h4 { margin: 0 0 1rem 0; font-size: 0.9rem; color: #374151; }
-.form-row { display: flex; gap: 0.75rem; align-items: center; }
+.form-row { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem; }
+.form-row:last-child { margin-bottom: 0; }
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 .modal-card { background-color: white; padding: 2rem; border-radius: 12px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
 .modal-card h3 { margin-top: 0; margin-bottom: 1.5rem; font-size: 1.25rem; color: #111827; }
