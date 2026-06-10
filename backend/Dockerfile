@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/src/main/resources/db/migration /app/db/migration
 
 EXPOSE 8080
 

@@ -79,8 +79,8 @@ services:
     # Niezawodny test basha (sprawdza czy port 8080 wewnątrz kontenera jest otwarty)
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo 'open'"]
-      interval: 5s
-      timeout: 5s
+      interval: 30s
+      timeout: 60s
       retries: 10
 
   ready-notifier:
