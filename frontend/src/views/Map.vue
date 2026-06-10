@@ -31,10 +31,8 @@
             <span class="priority-badge">{{ report.status || 'NEW' }}</span>
           </div>
           <p class="location-text">📍 Lat: {{ report.latitude.toFixed(4) }}, Lng: {{ report.longitude.toFixed(4) }}</p>
-
           <div class="card-footer">
             <span>Animals Affected: <strong>{{ report.animalsCount || 1 }}</strong></span>
-
             <button v-if="appMode === 'DRIVER'" @click.stop="completeIntervention(report.id)" class="complete-btn">
               ✓ Complete
             </button>
@@ -49,7 +47,6 @@
 
     <main class="map-container">
       <div id="leaflet-map"></div>
-
       <div class="routing-controls">
         <button v-if="!isRouteGenerated" @click="generateRoute(true)" class="route-btn generate">
           🗺️ Generate Route
@@ -64,12 +61,10 @@
       <div class="modal-card">
         <h3>🚨 Dispatch Unit</h3>
         <p class="coords-info">Coordinates: {{ newReportData.latitude.toFixed(5) }}, {{ newReportData.longitude.toFixed(5) }}</p>
-
         <div class="input-group">
           <label for="intervention-desc">Description:</label>
           <input id="intervention-desc" v-model="newReportData.description" type="text" placeholder="e.g. Injured stray dog..." />
         </div>
-
         <p style="margin-bottom: 2rem; color: #4B5563; font-size: 0.95rem;">
           Do you want to create a new intervention report at this location?
         </p>
@@ -83,15 +78,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+const AUTOCOMPLETE_RADIUS = 0.0003 // ~30m w stopniach
+
 const appMode = ref('DISPATCHER')
-const map = ref(null)
-const markers = ref([])
-const routeLine = ref(null)
+const map = shallowRef(null)
+const routeLine = shallowRef(null)
 const isRouteGenerated = ref(false)
 const interventions = ref([])
 
@@ -99,68 +95,233 @@ const showAddModal = ref(false)
 let tempMarker = null
 const newReportData = ref({ latitude: 0, longitude: 0, description: '' })
 
-const driverLocation = ref({ lat: 51.105000, lng: 17.035000 })
+const shelterLocation = { lat: 51.110000, lng: 17.030000 }
+
+// Aktualna pozycja samochodziku — startuje ze schroniska
+let driverPos = { lat: shelterLocation.lat, lng: shelterLocation.lng }
 let driverMarker = null
+
+// Mapa id -> marker leaflet dla interwencji
+const interventionMarkers = new Map()
+
+const completingIds = new Set()
+
+// Tryb jazdy: 'api' = pobiera z backendu, 'route' = jedzie po wyznaczonej trasie
+let drivingMode = 'api'
 
 let trackingInterval = null
 let animationInterval = null
-const routeCoordsArray = ref([])
+let routeCoords = []
+
+// ─── IKONA SAMOCHODZIKU ───────────────────────────────────────────────────────
+// Używamy zwykłego L.marker z emoji w divIcon — BEZ position:absolute i transform,
+// bo to powoduje "latanie". iconAnchor centruje ikonę na pozycji GPS.
+const getDriverIcon = () => L.divIcon({
+  className: '',
+  html: `<div style="
+    font-size: 28px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border-radius: 50%;
+    border: 2px solid #D41B65;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  ">🚓</div>`,
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -22]
+})
 
 const getCustomIcon = (type) => {
-  const color = type === 'Base' ? '#111827' : '#EF4444';
-  const svgHtml = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36" fill="${color}" style="display:block; position:absolute; transform:translate(-50%, -100%); top:0; left:0; overflow:visible;">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-      <circle cx="12" cy="9" r="2.5" fill="white"/>
-    </svg>`;
-  return L.divIcon({ className: '', html: svgHtml, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -36] });
-}
-
-const getDriverIcon = () => {
+  const color = type === 'Base' ? '#111827' : '#EF4444'
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:32px; background:white; border-radius:50%; width:44px; height:44px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,0.3); border:2px solid #D41B65; position:absolute; transform:translate(-50%,-50%); top:0; left:0;">🚓</div>`,
-    iconSize: [0, 0], iconAnchor: [0, 0]
+    html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36" fill="${color}">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      <circle cx="12" cy="9" r="2.5" fill="white"/>
+    </svg>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36]
   })
 }
 
-const shelterLocation = { lat: 51.110000, lng: 17.030000 }
-
+// ─── INICJALIZACJA MAPY ───────────────────────────────────────────────────────
 const initMap = () => {
   map.value = L.map('leaflet-map', { zoomControl: false }).setView([51.107883, 17.038538], 13)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map.value)
   L.control.zoom({ position: 'topright' }).addTo(map.value)
-  L.marker([shelterLocation.lat, shelterLocation.lng], { icon: getCustomIcon('Base') }).bindPopup('<b>🏠 Shelter Base</b>').addTo(map.value)
-  driverMarker = L.marker([driverLocation.value.lat, driverLocation.value.lng], { icon: getDriverIcon(), zIndexOffset: 1000 }).addTo(map.value)
+
+  L.marker([shelterLocation.lat, shelterLocation.lng], { icon: getCustomIcon('Base') })
+    .bindPopup('<b>🏠 Shelter Base</b>')
+    .addTo(map.value)
+
+  // Samochodzik jako zwykły marker — nigdy nie jest usuwany z mapy
+  driverMarker = L.marker([driverPos.lat, driverPos.lng], {
+    icon: getDriverIcon(),
+    zIndexOffset: 1000
+  }).addTo(map.value)
   driverMarker.bindPopup('<b>🚓 Driver Unit 1</b><br>Live GPS Tracking Active')
+
   map.value.on('click', handleMapClick)
 }
 
+// ─── TRYB API: ciągłe pobieranie pozycji z backendu ──────────────────────────
 const startLiveTracking = () => {
-  if (trackingInterval) return;
+  if (trackingInterval) return
   trackingInterval = setInterval(async () => {
+    if (drivingMode !== 'api') return // nie nadpisuj podczas jazdy po trasie
     try {
-      const token = localStorage.getItem('jwt_token');
-      const response = await axios.get('http://localhost:8080/api/tracking/unit1', { headers: { Authorization: `Bearer ${token}` } });
-      driverLocation.value.lat = response.data.latitude;
-      driverLocation.value.lng = response.data.longitude;
-      if (driverMarker) driverMarker.setLatLng([driverLocation.value.lat, driverLocation.value.lng]);
-    } catch (error) { console.error("Błąd pobierania pozycji API:", error); }
-  }, 3000);
+      const response = await axios.get('http://localhost:8080/api/driver/location', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` }
+      })
+      driverPos = { lat: response.data.latitude, lng: response.data.longitude }
+      driverMarker.setLatLng([driverPos.lat, driverPos.lng])
+    } catch (e) {
+      // backend niedostępny — samochodzik stoi w miejscu, nic się nie psuje
+    }
+  }, 3000)
 }
 
 const stopLiveTracking = () => {
-  if (trackingInterval) { clearInterval(trackingInterval); trackingInterval = null; }
+  if (trackingInterval) { clearInterval(trackingInterval); trackingInterval = null }
 }
 
-const setMode = (mode) => {
-  appMode.value = mode;
-  document.querySelector('.map-container').style.cursor = mode === 'DISPATCHER' ? 'crosshair' : 'default';
+// ─── TRYB ROUTE: animacja po wyznaczonej trasie ───────────────────────────────
+const animateAlongRoute = () => {
+  if (routeCoords.length < 2) return
+  drivingMode = 'route'
+  let targetIdx = 1
+  const SPEED = 0.000015
+
+  animationInterval = setInterval(() => {
+    const targetLat = routeCoords[targetIdx][0]
+    const targetLng = routeCoords[targetIdx][1]
+    const dLat = targetLat - driverPos.lat
+    const dLng = targetLng - driverPos.lng
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+
+    if (dist < SPEED) {
+      driverPos = { lat: targetLat, lng: targetLng }
+      targetIdx++
+      if (targetIdx >= routeCoords.length) {
+        // Dotarł do schroniska — koniec trasy
+        clearInterval(animationInterval)
+        animationInterval = null
+        if (routeLine.value) { map.value.removeLayer(routeLine.value); routeLine.value = null }
+        isRouteGenerated.value = false
+        drivingMode = 'api' // oddaj sterowanie z powrotem API
+        return
+      }
+    } else {
+      driverPos = {
+        lat: driverPos.lat + dLat * (SPEED / dist),
+        lng: driverPos.lng + dLng * (SPEED / dist)
+      }
+    }
+
+    driverMarker.setLatLng([driverPos.lat, driverPos.lng])
+    checkProximity()
+  }, 50)
 }
 
+// ─── AUTO-COMPLETE przy przejeździe ──────────────────────────────────────────
+const checkProximity = () => {
+  // kopia tablicy bo completeIntervention mutuje interventions.value
+  const current = [...interventions.value]
+  current.forEach(report => {
+    const dLat = report.latitude - driverPos.lat
+    const dLng = report.longitude - driverPos.lng
+    if (Math.sqrt(dLat * dLat + dLng * dLng) < AUTOCOMPLETE_RADIUS) {
+      completeIntervention(report.id)
+    }
+  })
+}
+
+// ─── GENEROWANIE TRASY ────────────────────────────────────────────────────────
+const generateRoute = async (fitBounds = true) => {
+  if (animationInterval) { clearInterval(animationInterval); animationInterval = null }
+  if (routeLine.value) { map.value.removeLayer(routeLine.value); routeLine.value = null }
+
+  const waypoints = [
+    [driverPos.lat, driverPos.lng],
+    ...interventions.value
+      .filter(inv => inv.latitude && inv.longitude)
+      .map(inv => [inv.latitude, inv.longitude]),
+    [shelterLocation.lat, shelterLocation.lng]
+  ]
+
+  if (waypoints.length < 2) return
+
+  try {
+    const coordsStr = waypoints.map(p => `${p[1]},${p[0]}`).join(';')
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`)
+    const data = await res.json()
+    if (data?.routes?.[0]) {
+      routeCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]])
+    } else {
+      routeCoords = waypoints
+    }
+  } catch {
+    routeCoords = waypoints
+  }
+
+  routeLine.value = L.polyline(routeCoords, { color: '#D41B65', weight: 4, opacity: 0.8 }).addTo(map.value)
+  if (fitBounds) map.value.fitBounds(routeLine.value.getBounds(), { padding: [50, 50] })
+  isRouteGenerated.value = true
+  animateAlongRoute()
+}
+
+const clearRoute = () => {
+  if (animationInterval) { clearInterval(animationInterval); animationInterval = null }
+  if (routeLine.value) { map.value.removeLayer(routeLine.value); routeLine.value = null }
+  isRouteGenerated.value = false
+  drivingMode = 'api'
+}
+
+// ─── INTERWENCJE ──────────────────────────────────────────────────────────────
+const fetchInterventions = async () => {
+  try {
+    const res = await axios.get('http://localhost:8080/api/interventions', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` }
+    })
+    interventions.value = res.data
+    interventions.value.forEach(report => {
+      if (report.latitude && report.longitude) {
+        const marker = L.marker([report.latitude, report.longitude], { icon: getCustomIcon('Intervention') })
+          .bindPopup(`<b>${report.description || 'Intervention'} #${report.id}</b>`)
+          .addTo(map.value)
+        interventionMarkers.set(report.id, marker)
+      }
+    })
+  } catch (e) { console.error('Failed to fetch interventions', e) }
+}
+
+const completeIntervention = async (id) => {
+  if (completingIds.has(id)) return          // już lecisz request, pomiń
+  if (!interventions.value.find(i => i.id === id)) return
+  completingIds.add(id)
+  try {
+    await axios.delete(`http://localhost:8080/api/interventions/${id}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` }
+    })
+  } catch (e) {
+    alert('Błąd podczas usuwania interwencji.')
+  } finally {
+    completingIds.delete(id)
+  }
+  interventions.value = interventions.value.filter(i => i.id !== id)
+  const marker = interventionMarkers.get(id)
+  if (marker) { map.value.removeLayer(marker); interventionMarkers.delete(id) }
+}
+
+// ─── DISPATCHER: klikanie na mapie ───────────────────────────────────────────
 const handleMapClick = (e) => {
-  if (appMode.value === 'DRIVER') return;
-  newReportData.value = { latitude: e.latlng.lat, longitude: e.latlng.lng, description: '' };
+  if (appMode.value === 'DRIVER') return
+  newReportData.value = { latitude: e.latlng.lat, longitude: e.latlng.lng, description: '' }
   if (tempMarker) map.value.removeLayer(tempMarker)
   tempMarker = L.marker([e.latlng.lat, e.latlng.lng], { icon: getCustomIcon('Intervention'), opacity: 0.5 }).addTo(map.value)
   showAddModal.value = true
@@ -168,106 +329,50 @@ const handleMapClick = (e) => {
 
 const cancelNewReport = () => {
   showAddModal.value = false
-  if (tempMarker) map.value.removeLayer(tempMarker)
+  if (tempMarker) { map.value.removeLayer(tempMarker); tempMarker = null }
 }
 
 const submitNewReport = async () => {
   try {
-    const userDesc = newReportData.value.description;
-    const response = await axios.post('http://localhost:8080/api/interventions', {
+    const userDesc = newReportData.value.description
+    const res = await axios.post('http://localhost:8080/api/interventions', {
       latitude: newReportData.value.latitude,
       longitude: newReportData.value.longitude
-    }, { headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` } });
+    }, { headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` } })
 
-    const savedReport = { ...response.data, description: userDesc };
-    interventions.value.unshift(savedReport);
+    const savedReport = { ...res.data, description: userDesc }
+    interventions.value.unshift(savedReport)
 
-    if (tempMarker) map.value.removeLayer(tempMarker);
-    L.marker([savedReport.latitude, savedReport.longitude], { icon: getCustomIcon('Intervention') })
-        .bindPopup(`<b>${userDesc || 'Intervention'} #${savedReport.id}</b>`)
-        .addTo(map.value);
+    if (tempMarker) { map.value.removeLayer(tempMarker); tempMarker = null }
 
-    showAddModal.value = false;
-  } catch (error) { alert("Błąd połączenia z serwerem."); }
+    const marker = L.marker([savedReport.latitude, savedReport.longitude], { icon: getCustomIcon('Intervention') })
+      .bindPopup(`<b>${userDesc || 'Intervention'} #${savedReport.id}</b>`)
+      .addTo(map.value)
+    interventionMarkers.set(savedReport.id, marker)
+
+    showAddModal.value = false
+  } catch (e) { alert('Błąd połączenia z serwerem.') }
 }
 
-const fetchInterventions = async () => {
-  try {
-    const response = await axios.get('http://localhost:8080/api/interventions', { headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` } });
-    interventions.value = response.data;
-    interventions.value.forEach(report => {
-      if(report.latitude && report.longitude) {
-        L.marker([report.latitude, report.longitude], { icon: getCustomIcon('Intervention') })
-            .bindPopup(`<b>${report.description || 'Intervention'} #${report.id}</b>`)
-            .addTo(map.value)
-      }
-    })
-  } catch (error) { console.error("Failed to fetch interventions", error) }
+const setMode = (mode) => {
+  appMode.value = mode
+  document.querySelector('.map-container').style.cursor = mode === 'DISPATCHER' ? 'crosshair' : 'default'
 }
 
-const focusMap = (lat, lng) => { if (lat && lng) map.value.flyTo([lat, lng], 16, { duration: 1.5 }) }
-
-const generateRoute = async (fitBounds = true) => {
-  if (routeLine.value) map.value.removeLayer(routeLine.value);
-  stopLiveTracking();
-  if (animationInterval) clearInterval(animationInterval);
-  const allPoints = [[driverLocation.value.lat, driverLocation.value.lng], ...interventions.value.filter(inv => inv.latitude && inv.longitude).map(inv => [inv.latitude, inv.longitude])];
-  if (allPoints.length > 1) {
-    try {
-      const coordsString = allPoints.map(p => `${p[1]},${p[0]}`).join(';');
-      // 🚨 ZMIANA: używamy 'route' zamiast 'trip'
-      const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`);
-      const data = await response.json();
-      if (data && data.routes && data.routes.length > 0) {
-        const osrmCoords = data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        routeLine.value = L.polyline(osrmCoords, { color: '#D41B65', weight: 4, opacity: 0.8 }).addTo(map.value);
-        if (fitBounds) map.value.fitBounds(routeLine.value.getBounds(), { padding: [50, 50] });
-        isRouteGenerated.value = true; routeCoordsArray.value = osrmCoords; animateCarAlongRoute();
-      }
-    } catch (error) {
-      routeLine.value = L.polyline(allPoints, { color: '#D41B65', weight: 4, dashArray: '10, 10' }).addTo(map.value);
-      isRouteGenerated.value = true; routeCoordsArray.value = allPoints; animateCarAlongRoute();
-    }
-  } else { startLiveTracking(); }
-};
-
-const animateCarAlongRoute = () => {
-  if (routeCoordsArray.value.length < 2) return;
-  let currentTargetIndex = 1;
-  const SPEED = 0.000015;
-  animationInterval = setInterval(() => {
-    const targetLat = routeCoordsArray.value[currentTargetIndex][0];
-    const targetLng = routeCoordsArray.value[currentTargetIndex][1];
-    const dLat = targetLat - driverLocation.value.lat; const dLng = targetLng - driverLocation.value.lng;
-    const distance = Math.sqrt(dLat * dLat + dLng * dLng);
-    if (distance < SPEED) {
-      driverLocation.value.lat = targetLat; driverLocation.value.lng = targetLng;
-      if (++currentTargetIndex >= routeCoordsArray.value.length) { clearInterval(animationInterval); clearRoute(); return; }
-    } else {
-      driverLocation.value.lat += dLat * (SPEED / distance); driverLocation.value.lng += dLng * (SPEED / distance);
-    }
-    if (driverMarker) driverMarker.setLatLng([driverLocation.value.lat, driverLocation.value.lng]);
-  }, 50);
-};
-
-const clearRoute = () => {
-  if (routeLine.value) map.value.removeLayer(routeLine.value)
-  if (animationInterval) { clearInterval(animationInterval); animationInterval = null; }
-  isRouteGenerated.value = false
-  startLiveTracking();
+const focusMap = (lat, lng) => {
+  if (lat && lng) map.value.flyTo([lat, lng], 16, { duration: 1.5 })
 }
 
-onMounted(() => { initMap(); fetchInterventions(); startLiveTracking(); })
-onBeforeUnmount(() => { clearInterval(animationInterval); clearInterval(trackingInterval); })
+onMounted(() => {
+  initMap()
+  fetchInterventions()
+  startLiveTracking()
+})
 
-const completeIntervention = async (id) => {
-  try {
-    const token = localStorage.getItem('jwt_token');
-    await axios.delete(`http://localhost:8080/api/interventions/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    interventions.value = interventions.value.filter(i => i.id !== id);
-    if (isRouteGenerated.value) generateRoute(false);
-  } catch (error) { alert("Błąd podczas usuwania interwencji."); }
-};
+onBeforeUnmount(() => {
+  stopLiveTracking()
+  if (animationInterval) clearInterval(animationInterval)
+})
 </script>
 
 <style scoped>
