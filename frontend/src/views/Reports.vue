@@ -35,7 +35,7 @@
             <div class="icon-wrapper blue">🐾</div>
           </div>
           <h2>{{ kpiData.totalAnimals }}</h2>
-          <p class="trend positive">{{ kpiData.trendAnimals }}% from last period</p>
+          <p class="trend positive">{{ kpiData.trendAnimals }}</p>
         </div>
 
         <div class="kpi-card">
@@ -58,11 +58,11 @@
 
         <div class="kpi-card">
           <div class="kpi-header">
-            <span>Avg. Stay Duration</span>
-            <div class="icon-wrapper green">⏱️</div>
+            <span>Quarantined Animals</span>
+            <div class="icon-wrapper green">🏥</div>
           </div>
           <h2>{{ kpiData.avgStay }}</h2>
-          <p class="trend neutral">days</p>
+          <p class="trend neutral">needs special care</p>
         </div>
       </section>
 
@@ -107,11 +107,14 @@ const isExporting = ref(false)
 const chartReady = ref(false)
 const showExportMenu = ref(false)
 
-// Domyślny zakres dat ustawiany na starcie
-const startDate = ref('2025-10-01')
-const endDate = ref('2026-04-30')
+// Ustawianie dat startowych: od pół roku temu do dziś
+const dzisiaj = new Date();
+const polRokuTemu = new Date(dzisiaj);
+polRokuTemu.setMonth(dzisiaj.getMonth() - 6);
 
-// Struktury danych przygotowane na przyjęcie obiektów z Twojego DTO z backendu
+const startDate = ref(polRokuTemu.toISOString().split('T')[0])
+const endDate = ref(dzisiaj.toISOString().split('T')[0])
+
 const kpiData = ref({
   totalAnimals: 0, trendAnimals: '0',
   totalAdoptions: 0, trendAdoptions: '0',
@@ -122,7 +125,7 @@ const kpiData = ref({
 const speciesData = ref({
   labels: ['Dogs', 'Cats', 'Rabbits', 'Birds'],
   datasets: [{
-    data: [0, 0, 0, 0], // Domyślnie puste, bazy danych uzupełnią te pola
+    data: [0, 0, 0, 0],
     backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'],
     borderWidth: 0,
     hoverOffset: 4
@@ -130,7 +133,7 @@ const speciesData = ref({
 })
 
 const trendData = ref({
-  labels: ['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'],
+  labels: [],
   datasets: [
     {
       label: 'Adoptions',
@@ -167,28 +170,33 @@ const lineOptions = {
   }
 }
 
-// 🚨 PRAWDZIWA FUNKCJA: Pobiera dane z bazy za pomocą stworzonego API w Spring Boocie
 const fetchData = async () => {
-  console.log(`Pobieranie prawdziwych danych dla zakresu: ${startDate.value} do ${endDate.value}`);
-
   try {
     const token = localStorage.getItem('jwt_token');
     const config = { headers: { Authorization: `Bearer ${token}` } };
 
-    // Strzał do Twojego nowego endpointu z parametrami dat
     const response = await axios.get(`http://localhost:8080/api/reports?start=${startDate.value}&end=${endDate.value}`, config);
 
-    // Mapowanie odebranego JSON-a (zgodnego z ReportResponseDTO) na reaktywne zmienne we Vue
     kpiData.value = response.data.kpi;
     speciesData.value.datasets[0].data = response.data.speciesDistribution;
     trendData.value.datasets[0].data = response.data.adoptionsArray;
     trendData.value.datasets[1].data = response.data.interventionsArray;
 
+    // Generowanie nazw miesięcy na podstawie endDate
+    const end = new Date(endDate.value);
+    const newLabels = [];
+    for (let i = 5; i >= 0; i--) {
+      const tempDate = new Date(end.getFullYear(), end.getMonth() - i, 1);
+      const monthName = tempDate.toLocaleString('en-US', { month: 'short' });
+      newLabels.push(monthName);
+    }
+
+    trendData.value.labels = newLabels;
+
   } catch (error) {
     console.error("Błąd podczas pobierania danych raportowych z bazy:", error);
   }
 
-  // Odświeżenie widoku wykresów po wstrzyknięciu nowych danych
   chartReady.value = false;
   setTimeout(() => { chartReady.value = true; }, 50);
 }
@@ -231,7 +239,6 @@ const exportReport = async (format) => {
   }
 }
 
-// 🚨 ZMIANA: Wywołujemy pobieranie danych z bazy OD RAZU przy wejściu na stronę
 onMounted(() => {
   fetchData();
 })
@@ -267,22 +274,28 @@ onMounted(() => {
 .date-input-group label { font-size: 0.75rem; color: #9CA3AF; margin-bottom: 4px; }
 .date-input-group input { padding: 0.5rem; border: 1px solid #E5E7EB; border-radius: 6px; outline: none; color: #374151; font-family: inherit; }
 .separator { color: #9CA3AF; }
-
+/* Zmodyfikowany kontener */
 .export-dropdown {
   position: relative;
   display: inline-block;
 }
 
-.export-btn {
-  background-color: #D41B65; color: white; border: none; padding: 0.75rem 1.5rem;
-  border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+/* 🚨 NOWOŚĆ: Niewidzialny mostek łączący guzik z menu */
+.export-dropdown::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 15px; /* Wysokość mostka zasłaniająca pustą przestrzeń */
+  background: transparent;
+  z-index: 99;
 }
-.export-btn:hover { background-color: #b01553; }
-.export-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
+/* Zmodyfikowane menu (zmienione top) */
 .dropdown-menu {
   position: absolute;
-  top: 110%;
+  top: calc(100% + 8px); /* Menu odsunięte w dół o równe 8px, a nie zdradliwe 10% */
   right: 0;
   background-color: white;
   border: 1px solid #E5E7EB;
@@ -294,6 +307,15 @@ onMounted(() => {
   z-index: 100;
   min-width: 160px;
 }
+
+.export-btn {
+  background-color: #D41B65; color: white; border: none; padding: 0.75rem 1.5rem;
+  border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+}
+.export-btn:hover { background-color: #b01553; }
+.export-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+
 
 .dropdown-menu button {
   padding: 0.75rem 1rem;
