@@ -164,20 +164,20 @@
                 <div v-if="activeView === 'registry'" class="add-record-form">
                   <h4>+ Add Adoption Status Change</h4>
                   <div class="form-row">
-                    <input type="date" v-model="newAdoptionStatus[animal.id].date" class="input-field">
+                    <input type="date" v-model="newAdoptionStatus[animal.id].date" :max="today" class="input-field">
                     <select v-model="newAdoptionStatus[animal.id].status" class="input-field">
                       <option value="" disabled>Select status</option>
-                      <option value="Available">Available</option>
-                      <option value="Pending">Pending</option>
-                      <option value="On Hold">On Hold</option>
-                      <option value="Adopted">Adopted</option>
-                      <option value="Finalized">Finalized</option>
+                      <option value="Available" :disabled="animal.status === 'Available'">Available</option>
+                      <option value="Pending" :disabled="animal.status === 'Pending'">Pending</option>
+                      <option value="On Hold" :disabled="animal.status === 'On Hold'">On Hold</option>
+                      <option value="Adopted" :disabled="animal.status === 'Adopted'">Adopted</option>
+                      <option value="Finalized" :disabled="animal.status === 'Finalized'">Finalized</option>
                     </select>
                   </div>
                   <div class="form-row">
                     <input type="text" v-model="newAdoptionStatus[animal.id].owner" placeholder="Owner" class="input-field flex-grow">
                     <input type="text" v-model="newAdoptionStatus[animal.id].notes" placeholder="Description (optional)" class="input-field flex-grow">
-                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animalId)">Save</button>
+                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animal.id)">Save</button>
                   </div>
                 </div>
               </div>
@@ -239,7 +239,6 @@ const medicalRecordTypes = ref([])
 const activeView = ref('registry')
 const showAddModal = ref(false)
 
-// Zmiana age: 0 na birthDate: ''
 const newAnimal = ref({ name: '', species: 'Dog', birthDate: '', status: 'Available' })
 const today = new Date().toISOString().split('T')[0]
 const newMedical = ref({})
@@ -317,7 +316,7 @@ const fetchAnimals = async () => {
         photo: animal.species === 'Cat' ? '🐱' : (animal.species === 'Dog' ? '🐕' : '🐾'),
         name: animal.name,
         species: animal.species,
-        age: animal.age ?? 0, // dynamiczny age pobierany z getAge() z backendu
+        age: animal.age ?? 0, 
         kennel: animal.kennel ? animal.kennel.code : '-',
         status: animal.adoptionStatus,
         date: new Date().toISOString().split('T')[0],
@@ -379,7 +378,6 @@ const submitNewAnimal = async () => {
   if (!newAnimal.value.name) return alert("Please provide the animal's name!");
   if (!newAnimal.value.birthDate) return alert("Please select a birth date!");
   
-  // Nowa walidacja daty z przyszłości
   if (newAnimal.value.birthDate > today) {
     return alert("Birth date cannot be in the future!");
   }
@@ -434,7 +432,21 @@ const submitMedicalRecord = async (animalId) => {
 
 const submitAdoptionStatusChange = async (animalId) => {
   const recordData = newAdoptionStatus.value[animalId];
-  if (!recordData.date || !recordData.status || !recordData.owner) return alert("Please fill in the date, status, and owner!");
+  const animal = animals.value.find(a => a.id === animalId);
+
+  if (!recordData.date || !recordData.status || !recordData.owner) {
+    return alert("Please fill in the date, status, and owner!");
+  }
+
+  // Walidacja 1: Data z przyszłości
+  if (recordData.date > today) {
+    return alert("The date cannot be in the future!");
+  }
+
+  // Walidacja 2: Ten sam status
+  if (animal && recordData.status === animal.status) {
+    return alert("The new status must be different from the current one!");
+  }
 
   try {
     await axios.patch(`http://localhost:8080/api/animals/${animalId}/adoption-status`, {
@@ -449,7 +461,6 @@ const submitAdoptionStatusChange = async (animalId) => {
       animal: { id: animalId }
     })
 
-    const animal = animals.value.find(a => a.id === animalId);
     if (animal) {
       animal.status = recordData.status
       if (!animal.adoptionStatusHistory) {
@@ -463,7 +474,7 @@ const submitAdoptionStatusChange = async (animalId) => {
       })
     }
 
-    newAdoptionStatus.value[animalId] = { date: new Date().toISOString().split('T')[0], status: '', owner: '', notes: '' };
+    newAdoptionStatus.value[animalId] = { date: today, status: '', owner: '', notes: '' };
   } catch (error) {
     console.error("Error saving adoption status change:", error)
     alert("An error occurred while saving the adoption status change.");
