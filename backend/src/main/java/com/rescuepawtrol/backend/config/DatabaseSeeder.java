@@ -104,7 +104,7 @@ public class DatabaseSeeder {
                 Animal a4  = animal("Charlie",  "Dog",    LocalDate.now().minusYears(4), "Available",  false);
                 Animal a5  = animal("Duke",     "Dog",    LocalDate.now().minusYears(6), "On Hold",    false);
                 Animal a6  = animal("Bella",    "Dog",    LocalDate.now().minusYears(1), "Available",  false);
-                Animal a7  = animal("Rex",      "Dog",    LocalDate.now().minusYears(7), "Available",  true);
+                Animal a7  = animal("Rex",      "Dog",    LocalDate.now().minusYears(7), "Available",  false);
 
 // Cats (7)
                 Animal a8  = animal("Whiskers", "Cat",    LocalDate.now().minusYears(2), "Available",  false);
@@ -112,7 +112,7 @@ public class DatabaseSeeder {
                 Animal a10 = animal("Mittens",  "Cat",    LocalDate.now().minusYears(4), "Available",  false);
                 Animal a11 = animal("Shadow",   "Cat",    LocalDate.now().minusYears(3), "On Hold",    false);
                 Animal a12 = animal("Cleo",     "Cat",    LocalDate.now().minusYears(5), "Available",  false);
-                Animal a13 = animal("Nala",     "Cat",    LocalDate.now().minusYears(2), "Available",  true);
+                Animal a13 = animal("Nala",     "Cat",    LocalDate.now().minusYears(2), "Available",  false);
                 Animal a14 = animal("Simba",    "Cat",    LocalDate.now().minusYears(6), "Available",  false);
 
 // Other (6)
@@ -121,7 +121,7 @@ public class DatabaseSeeder {
                 Animal a17 = animal("Tweety",   "Bird",   LocalDate.now().minusYears(3), "Available",  false);
                 Animal a18 = animal("Polly",    "Bird",   LocalDate.now().minusYears(4), "On Hold",    false);
                 Animal a19 = animal("Nibbles",  "Hamster",LocalDate.now().minusYears(1), "Available",  false);
-                Animal a20 = animal("Patches",  "Rabbit", LocalDate.now().minusYears(2), "Available",  true);
+                Animal a20 = animal("Patches",  "Rabbit", LocalDate.now().minusYears(2), "Available",  false);
 
                 animalRepository.saveAll(List.of(
                         a1,  a2,  a3,  a4,  a5,  a6,  a7,

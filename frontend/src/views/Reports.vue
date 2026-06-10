@@ -18,7 +18,10 @@
 
         <div class="export-dropdown" @mouseleave="showExportMenu = false">
           <button class="export-btn" @click="showExportMenu = !showExportMenu" :disabled="isExporting">
-            {{ isExporting ? '⏳ Generating...' : '📥 Export Report ▼' }}
+            <span>{{ isExporting ? '⏳ Generating...' : '📥 Export Report' }}</span>
+            <svg v-if="!isExporting" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron" :class="{ 'open': showExportMenu }">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
           </button>
 
           <div v-if="showExportMenu && !isExporting" class="dropdown-menu">
@@ -35,7 +38,9 @@
             <div class="icon-wrapper blue">🐾</div>
           </div>
           <h2>{{ kpiData.totalAnimals }}</h2>
-          <p class="trend positive">{{ kpiData.trendAnimals }}</p>
+          <p :class="['trend', kpiData.trendAnimals >= 0 ? 'positive' : 'negative']">
+            {{ kpiData.trendAnimals > 0 ? '+' : '' }}{{ kpiData.trendAnimals }} vs previous {{ selectedDays }} days
+          </p>
         </div>
 
         <div class="kpi-card">
@@ -44,7 +49,9 @@
             <div class="icon-wrapper pink">📈</div>
           </div>
           <h2>{{ kpiData.totalAdoptions }}</h2>
-          <p class="trend positive">{{ kpiData.trendAdoptions }}% from last period</p>
+          <p :class="['trend', kpiData.trendAdoptions >= 0 ? 'positive' : 'negative']">
+            {{ kpiData.trendAdoptions > 0 ? '+' : '' }}{{ kpiData.trendAdoptions }}% vs previous {{ selectedDays }} days
+          </p>
         </div>
 
         <div class="kpi-card">
@@ -53,7 +60,9 @@
             <div class="icon-wrapper orange">💉</div>
           </div>
           <h2>{{ kpiData.interventions }}</h2>
-          <p class="trend positive">{{ kpiData.trendInterventions }}% from last period</p>
+          <p :class="['trend', kpiData.trendInterventions >= 0 ? 'positive' : 'negative']">
+            {{ kpiData.trendInterventions > 0 ? '+' : '' }}{{ kpiData.trendInterventions }}% vs previous {{ selectedDays }} days
+          </p>
         </div>
 
         <div class="kpi-card">
@@ -61,8 +70,8 @@
             <span>Quarantined Animals</span>
             <div class="icon-wrapper green">🏥</div>
           </div>
-          <h2>{{ kpiData.avgStay }}</h2>
-          <p class="trend neutral">needs special care</p>
+          <h2>{{ kpiData.quarantined }}</h2>
+          <p class="trend neutral">Needs special care</p>
         </div>
       </section>
 
@@ -93,7 +102,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Filler } from 'chart.js'
 import { Line, Doughnut } from 'vue-chartjs'
@@ -107,26 +116,35 @@ const isExporting = ref(false)
 const chartReady = ref(false)
 const showExportMenu = ref(false)
 
-// Ustawianie dat startowych: od pół roku temu do dziś
+// POPRAWKA: Automatyczne ustawienie na ostatni miesiąc
 const dzisiaj = new Date();
-const polRokuTemu = new Date(dzisiaj);
-polRokuTemu.setMonth(dzisiaj.getMonth() - 6);
+const miesiacTemu = new Date(dzisiaj);
+miesiacTemu.setMonth(dzisiaj.getMonth() - 1);
 
-const startDate = ref(polRokuTemu.toISOString().split('T')[0])
+const startDate = ref(miesiacTemu.toISOString().split('T')[0])
 const endDate = ref(dzisiaj.toISOString().split('T')[0])
 
+const selectedDays = computed(() => {
+  const start = new Date(startDate.value);
+  const end = new Date(endDate.value);
+  const diffTime = Math.abs(end - start);
+  return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+});
+
+// POPRAWKA: Zmiana avgStay na quarantined
 const kpiData = ref({
-  totalAnimals: 0, trendAnimals: '0',
-  totalAdoptions: 0, trendAdoptions: '0',
-  interventions: 0, trendInterventions: '0',
-  avgStay: 0
+  totalAnimals: 0, trendAnimals: 0,
+  totalAdoptions: 0, trendAdoptions: 0,
+  interventions: 0, trendInterventions: 0,
+  quarantined: 0 
 })
 
 const speciesData = ref({
   labels: ['Dogs', 'Cats', 'Rabbits', 'Birds'],
   datasets: [{
     data: [0, 0, 0, 0],
-    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'],
+    // POPRAWKA: Pastelowe kolorki
+    backgroundColor: ['#FFB3BA', '#FFDFBA', '#BAFFC9', '#BAE1FF'],
     borderWidth: 0,
     hoverOffset: 4
   }]
@@ -177,12 +195,21 @@ const fetchData = async () => {
 
     const response = await axios.get(`http://localhost:8080/api/reports?start=${startDate.value}&end=${endDate.value}`, config);
 
-    kpiData.value = response.data.kpi;
-    speciesData.value.datasets[0].data = response.data.speciesDistribution;
-    trendData.value.datasets[0].data = response.data.adoptionsArray;
-    trendData.value.datasets[1].data = response.data.interventionsArray;
+    // Mapowanie wyników z backendu
+    kpiData.value = {
+      totalAnimals: response.data.kpi?.totalAnimals || 0,
+      trendAnimals: response.data.kpi?.trendAnimals || 0,
+      totalAdoptions: response.data.kpi?.totalAdoptions || 0,
+      trendAdoptions: response.data.kpi?.trendAdoptions || 0,
+      interventions: response.data.kpi?.interventions || 0,
+      trendInterventions: response.data.kpi?.trendInterventions || 0,
+      quarantined: response.data.kpi?.quarantined || response.data.kpi?.quarantinedAnimals || 0 
+    };
+    
+    speciesData.value.datasets[0].data = response.data.speciesDistribution || [0,0,0,0];
+    trendData.value.datasets[0].data = response.data.adoptionsArray || [0,0,0,0,0,0];
+    trendData.value.datasets[1].data = response.data.interventionsArray || [0,0,0,0,0,0];
 
-    // Generowanie nazw miesięcy na podstawie endDate
     const end = new Date(endDate.value);
     const newLabels = [];
     for (let i = 5; i >= 0; i--) {
@@ -274,28 +301,26 @@ onMounted(() => {
 .date-input-group label { font-size: 0.75rem; color: #9CA3AF; margin-bottom: 4px; }
 .date-input-group input { padding: 0.5rem; border: 1px solid #E5E7EB; border-radius: 6px; outline: none; color: #374151; font-family: inherit; }
 .separator { color: #9CA3AF; }
-/* Zmodyfikowany kontener */
+
 .export-dropdown {
   position: relative;
   display: inline-block;
 }
 
-/* 🚨 NOWOŚĆ: Niewidzialny mostek łączący guzik z menu */
 .export-dropdown::after {
   content: '';
   position: absolute;
   top: 100%;
   left: 0;
   width: 100%;
-  height: 15px; /* Wysokość mostka zasłaniająca pustą przestrzeń */
+  height: 15px;
   background: transparent;
   z-index: 99;
 }
 
-/* Zmodyfikowane menu (zmienione top) */
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 8px); /* Menu odsunięte w dół o równe 8px, a nie zdradliwe 10% */
+  top: calc(100% + 8px);
   right: 0;
   background-color: white;
   border: 1px solid #E5E7EB;
@@ -309,13 +334,27 @@ onMounted(() => {
 }
 
 .export-btn {
-  background-color: #D41B65; color: white; border: none; padding: 0.75rem 1.5rem;
-  border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+  background-color: #D41B65; 
+  color: white; 
+  border: none; 
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px; 
+  font-weight: 600; 
+  cursor: pointer; 
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .export-btn:hover { background-color: #b01553; }
 .export-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
-
+.chevron {
+  transition: transform 0.3s ease;
+}
+.chevron.open {
+  transform: rotate(180deg);
+}
 
 .dropdown-menu button {
   padding: 0.75rem 1rem;
@@ -348,6 +387,7 @@ onMounted(() => {
 .kpi-card h2 { margin: 0 0 0.5rem 0; font-size: 2rem; color: #111827; }
 .trend { margin: 0; font-size: 0.85rem; font-weight: 500; }
 .trend.positive { color: #10B981; }
+.trend.negative { color: #EF4444; }
 .trend.neutral { color: #6B7280; }
 
 .icon-wrapper { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
