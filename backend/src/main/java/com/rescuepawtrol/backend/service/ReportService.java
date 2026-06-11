@@ -4,6 +4,7 @@ import com.rescuepawtrol.backend.dto.KpiDTO;
 import com.rescuepawtrol.backend.dto.ReportResponseDTO;
 import com.rescuepawtrol.backend.model.AdoptionCard;
 import com.rescuepawtrol.backend.model.MedicalRecord;
+import com.rescuepawtrol.backend.model.enums.AdoptionStatus;
 import com.rescuepawtrol.backend.repository.AdoptionCardRepository;
 import com.rescuepawtrol.backend.repository.AnimalRepository;
 import com.rescuepawtrol.backend.repository.MedicalRecordRepository;
@@ -34,11 +35,9 @@ public class ReportService {
     public ReportResponseDTO generateReportData(LocalDate start, LocalDate end) {
         ReportResponseDTO response = new ReportResponseDTO();
 
-        // --- 1. POBIERANIE DANYCH DLA KAFELKÓW (Wybrany zakres z kalendarza) ---
         List<AdoptionCard> currentAdoptions = adoptionCardRepository.findAllBySubmissionDateBetween(start, end);
         List<MedicalRecord> currentMedical = medicalRecordRepository.findAllByRecordDateBetween(start, end);
 
-        // --- 2. POBIERANIE DANYCH DO TRENDÓW (Poprzedni analogiczny okres) ---
         long daysBetween = ChronoUnit.DAYS.between(start, end) + 1;
         LocalDate previousStart = start.minusDays(daysBetween);
         LocalDate previousEnd = start.minusDays(1);
@@ -46,11 +45,17 @@ public class ReportService {
         List<AdoptionCard> previousAdoptions = adoptionCardRepository.findAllBySubmissionDateBetween(previousStart, previousEnd);
         List<MedicalRecord> previousMedical = medicalRecordRepository.findAllByRecordDateBetween(previousStart, previousEnd);
 
-        // --- 3. WYLICZANIE KPI ---
         KpiDTO kpi = new KpiDTO();
 
-        kpi.setTotalAdoptions(currentAdoptions.size());
-        kpi.setTrendAdoptions(calculateTrend(currentAdoptions.size(), previousAdoptions.size()));
+        long completedCurrent = currentAdoptions.stream()
+                .filter(a -> a.getStatus() == AdoptionStatus.COMPLETED)
+                .count();
+        long completedPrevious = previousAdoptions.stream()
+                .filter(a -> a.getStatus() == AdoptionStatus.COMPLETED)
+                .count();
+
+        kpi.setTotalAdoptions((int) completedCurrent);
+        kpi.setTrendAdoptions(calculateTrend((int) completedCurrent, (int) completedPrevious));
 
         kpi.setInterventions(currentMedical.size());
         kpi.setTrendInterventions(calculateTrend(currentMedical.size(), previousMedical.size()));
@@ -59,14 +64,12 @@ public class ReportService {
         long availableAnimals = animalRepository.countByAdoptionStatusIgnoreCase("Available");
         kpi.setTrendAnimals(availableAnimals + " ready for adoption");
 
-        // Właściwe pole dla kwarantanny
         long quarantinedAnimals = animalRepository.countByIsQuarantinedTrue();
         kpi.setQuarantined((int) quarantinedAnimals);
 
         response.setKpi(kpi);
 
-        // --- 4. WYKRES LINIOWY (Zawsze pełne 6 miesięcy wstecz od end_date) ---
-        LocalDate sixMonthsAgo = end.minusMonths(5).withDayOfMonth(1); // Początek miesiąca 6 mies. temu
+        LocalDate sixMonthsAgo = end.minusMonths(5).withDayOfMonth(1);
 
         List<AdoptionCard> chartAdoptions = adoptionCardRepository.findAllBySubmissionDateBetween(sixMonthsAgo, end);
         List<MedicalRecord> chartMedical = medicalRecordRepository.findAllByRecordDateBetween(sixMonthsAgo, end);
@@ -78,7 +81,9 @@ public class ReportService {
             YearMonth targetMonth = YearMonth.from(end).minusMonths(i);
 
             long adoptionsInMonth = chartAdoptions.stream()
-                    .filter(a -> a.getSubmissionDate() != null && YearMonth.from(a.getSubmissionDate()).equals(targetMonth))
+                    .filter(a -> a.getSubmissionDate() != null
+                            && a.getStatus() == AdoptionStatus.COMPLETED
+                            && YearMonth.from(a.getSubmissionDate()).equals(targetMonth))
                     .count();
             adoptionsArray.add((int) adoptionsInMonth);
 
@@ -91,7 +96,6 @@ public class ReportService {
         response.setAdoptionsArray(adoptionsArray);
         response.setInterventionsArray(interventionsArray);
 
-        // --- 5. WYKRES KOŁOWY ---
         long dogs = animalRepository.countBySpeciesIgnoreCase("Dog");
         long cats = animalRepository.countBySpeciesIgnoreCase("Cat");
         long rabbits = animalRepository.countBySpeciesIgnoreCase("Rabbit");

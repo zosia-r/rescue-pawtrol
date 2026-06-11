@@ -38,9 +38,6 @@
             <div class="icon-wrapper blue">🐾</div>
           </div>
           <h2>{{ kpiData.totalAnimals }}</h2>
-          <p :class="['trend', kpiData.trendAnimals >= 0 ? 'positive' : 'negative']">
-            {{ kpiData.trendAnimals > 0 ? '+' : '' }}{{ kpiData.trendAnimals }} vs previous {{ selectedDays }} days
-          </p>
         </div>
 
         <div class="kpi-card">
@@ -49,9 +46,6 @@
             <div class="icon-wrapper pink">📈</div>
           </div>
           <h2>{{ kpiData.totalAdoptions }}</h2>
-          <p :class="['trend', kpiData.trendAdoptions >= 0 ? 'positive' : 'negative']">
-            {{ kpiData.trendAdoptions > 0 ? '+' : '' }}{{ kpiData.trendAdoptions }}% vs previous {{ selectedDays }} days
-          </p>
         </div>
 
         <div class="kpi-card">
@@ -60,9 +54,6 @@
             <div class="icon-wrapper orange">💉</div>
           </div>
           <h2>{{ kpiData.interventions }}</h2>
-          <p :class="['trend', kpiData.trendInterventions >= 0 ? 'positive' : 'negative']">
-            {{ kpiData.trendInterventions > 0 ? '+' : '' }}{{ kpiData.trendInterventions }}% vs previous {{ selectedDays }} days
-          </p>
         </div>
 
         <div class="kpi-card">
@@ -71,7 +62,6 @@
             <div class="icon-wrapper green">🏥</div>
           </div>
           <h2>{{ kpiData.quarantined }}</h2>
-          <p class="trend neutral">Needs special care</p>
         </div>
       </section>
 
@@ -102,7 +92,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Filler } from 'chart.js'
 import { Line, Doughnut } from 'vue-chartjs'
@@ -116,26 +106,17 @@ const isExporting = ref(false)
 const chartReady = ref(false)
 const showExportMenu = ref(false)
 
-// POPRAWKA: Automatyczne ustawienie na ostatni miesiąc
 const dzisiaj = new Date();
-const miesiacTemu = new Date(dzisiaj);
-miesiacTemu.setMonth(dzisiaj.getMonth() - 1);
+const polRokuTemu = new Date(dzisiaj);
+polRokuTemu.setMonth(dzisiaj.getMonth() - 6);
 
-const startDate = ref(miesiacTemu.toISOString().split('T')[0])
+const startDate = ref(polRokuTemu.toISOString().split('T')[0])
 const endDate = ref(dzisiaj.toISOString().split('T')[0])
 
-const selectedDays = computed(() => {
-  const start = new Date(startDate.value);
-  const end = new Date(endDate.value);
-  const diffTime = Math.abs(end - start);
-  return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-});
-
-// POPRAWKA: Zmiana avgStay na quarantined
 const kpiData = ref({
-  totalAnimals: 0, trendAnimals: 0,
-  totalAdoptions: 0, trendAdoptions: 0,
-  interventions: 0, trendInterventions: 0,
+  totalAnimals: 0,
+  totalAdoptions: 0,
+  interventions: 0,
   quarantined: 0 
 })
 
@@ -143,7 +124,6 @@ const speciesData = ref({
   labels: ['Dogs', 'Cats', 'Rabbits', 'Birds'],
   datasets: [{
     data: [0, 0, 0, 0],
-    // POPRAWKA: Pastelowe kolorki
     backgroundColor: ['#FFB3BA', '#FFDFBA', '#BAFFC9', '#BAE1FF'],
     borderWidth: 0,
     hoverOffset: 4
@@ -195,14 +175,10 @@ const fetchData = async () => {
 
     const response = await axios.get(`http://localhost:8080/api/reports?start=${startDate.value}&end=${endDate.value}`, config);
 
-    // Mapowanie wyników z backendu
     kpiData.value = {
       totalAnimals: response.data.kpi?.totalAnimals || 0,
-      trendAnimals: response.data.kpi?.trendAnimals || 0,
       totalAdoptions: response.data.kpi?.totalAdoptions || 0,
-      trendAdoptions: response.data.kpi?.trendAdoptions || 0,
       interventions: response.data.kpi?.interventions || 0,
-      trendInterventions: response.data.kpi?.trendInterventions || 0,
       quarantined: response.data.kpi?.quarantined || response.data.kpi?.quarantinedAnimals || 0 
     };
     
@@ -385,10 +361,6 @@ onMounted(() => {
 }
 .kpi-header { display: flex; justify-content: space-between; align-items: center; color: #6B7280; font-size: 0.9rem; margin-bottom: 1rem; }
 .kpi-card h2 { margin: 0 0 0.5rem 0; font-size: 2rem; color: #111827; }
-.trend { margin: 0; font-size: 0.85rem; font-weight: 500; }
-.trend.positive { color: #10B981; }
-.trend.negative { color: #EF4444; }
-.trend.neutral { color: #6B7280; }
 
 .icon-wrapper { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 .icon-wrapper.blue { background-color: #EFF6FF; color: #3B82F6; }

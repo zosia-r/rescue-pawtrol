@@ -1,7 +1,6 @@
 <template>
   <div class="floorplan-container">
 
-    <!-- Main grid -->
     <div class="floorplan-main">
 
       <div class="sectors-grid">
@@ -17,7 +16,6 @@
 
           <div class="kennels-grid">
 
-            <!-- KENNEL -->
             <div
               v-for="kennel in sector.kennels"
               :key="kennel.id"
@@ -69,7 +67,6 @@
 
               </div>
 
-              <!-- EXPANDED CONTENT -->
               <transition name="expand">
                 <div
                   v-if="selectedKennel?.id === kennel.id"
@@ -118,7 +115,6 @@
         </div>
       </div>
 
-      <!-- Legend -->
       <div class="legend-card">
         <span class="legend-title">Occupancy Status</span>
 
@@ -141,10 +137,8 @@
       </div>
     </div>
 
-    <!-- RIGHT PANEL -->
     <div class="side-panel">
 
-      <!-- AVAILABLE ANIMALS -->
       <div class="panel-section">
 
         <div class="panel-section-header">
@@ -192,7 +186,6 @@
         </div>
       </div>
 
-      <!-- STATS -->
       <div class="stats-card">
 
         <div class="stat-row">
@@ -251,18 +244,21 @@ const fetchData = async () => {
       )
     ])
 
-    allAnimals.value = animalsRes.data.map(a => ({
-      id: a.id,
-      name: a.name,
-      species: a.species,
+    // Filtrujemy zwierzęta z "Completed" zanim trafią do widoku mapy
+    allAnimals.value = animalsRes.data
+      .filter(a => a.adoptionStatus !== 'Completed')
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        species: a.species,
 
-      age: a.age
-        ? `${a.age} ${a.age === 1 ? 'year' : 'years'}`
-        : '',
+        age: a.age
+          ? `${a.age} ${a.age === 1 ? 'year' : 'years'}`
+          : '',
 
-      adoptionStatus: a.adoptionStatus,
-      kennelId: a.kennel?.id ?? null
-    }))
+        adoptionStatus: a.adoptionStatus,
+        kennelId: a.kennel?.id ?? null
+      }))
 
     const sectorMap = {}
 
@@ -364,8 +360,7 @@ const getStatusClass = (status) => {
   const map = {
     Available: 'status-available',
     Pending: 'status-pending',
-    'On Hold': 'status-on-hold',
-    Adopted: 'status-adopted'
+    Completed: 'status-completed'
   }
 
   return map[status] ?? ''
@@ -968,12 +963,7 @@ onMounted(fetchData)
   color: #92400E;
 }
 
-.status-on-hold {
-  background: #F3F4F6;
-  color: #4B5563;
-}
-
-.status-adopted {
+.status-completed {
   background: #DBEAFE;
   color: #1E40AF;
 }

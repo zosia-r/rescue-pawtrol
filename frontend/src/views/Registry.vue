@@ -47,8 +47,6 @@
             <option value="">All Statuses</option>
             <option value="Available">Available</option>
             <option value="Pending">Pending</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Adopted">Adopted</option>
           </select>
         </div>
 
@@ -169,9 +167,7 @@
                       <option value="" disabled>Select status</option>
                       <option value="Available" :disabled="animal.status === 'Available'">Available</option>
                       <option value="Pending" :disabled="animal.status === 'Pending'">Pending</option>
-                      <option value="On Hold" :disabled="animal.status === 'On Hold'">On Hold</option>
-                      <option value="Adopted" :disabled="animal.status === 'Adopted'">Adopted</option>
-                      <option value="Finalized" :disabled="animal.status === 'Finalized'">Finalized</option>
+                      <option value="Completed" :disabled="animal.status === 'Completed'">Completed</option>
                     </select>
                   </div>
                   <div class="form-row">
@@ -253,9 +249,10 @@ const filters = ref({
 
 const filteredAnimals = computed(() => {
   return animals.value.filter(animal => {
+    // Registry łapie Available i Pending. Archive łapie Completed.
     const matchesView = activeView.value === 'registry' 
-      ? animal.status !== 'Finalized' 
-      : animal.status === 'Finalized'
+      ? animal.status !== 'Completed' 
+      : animal.status === 'Completed'
 
     if (!matchesView) return false
 
@@ -438,12 +435,10 @@ const submitAdoptionStatusChange = async (animalId) => {
     return alert("Please fill in the date, status, and owner!");
   }
 
-  // Walidacja 1: Data z przyszłości
   if (recordData.date > today) {
     return alert("The date cannot be in the future!");
   }
 
-  // Walidacja 2: Ten sam status
   if (animal && recordData.status === animal.status) {
     return alert("The new status must be different from the current one!");
   }
@@ -472,6 +467,11 @@ const submitAdoptionStatusChange = async (animalId) => {
         owner: recordData.owner,
         notes: recordData.notes || null
       })
+      
+      // Jeśli status to Completed, usuń z widoku schroniska (przenosi do archiwum)
+      if(recordData.status === 'Completed') {
+         animal.kennel = '-';
+      }
     }
 
     newAdoptionStatus.value[animalId] = { date: today, status: '', owner: '', notes: '' };
@@ -512,9 +512,7 @@ const getStatusClass = (status) => {
   switch(status) {
     case 'Available': return 'status-available';
     case 'Pending': return 'status-pending';
-    case 'On Hold': return 'status-on-hold';
-    case 'Adopted': return 'status-adopted';
-    case 'Finalized': return 'status-finalized';
+    case 'Completed': return 'status-completed';
     default: return '';
   }
 }
@@ -544,9 +542,7 @@ onActivated(() => {
 .status-badge { padding: 0.35rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
 .status-available { background-color: #D1FAE5; color: #065F46; }
 .status-pending { background-color: #FEF3C7; color: #92400E; }
-.status-on-hold { background-color: #F3F4F6; color: #4B5563; }
-.status-adopted { background-color: #DBEAFE; color: #1E40AF; }
-.status-finalized { background-color: #DDD6FE; color: #4F46E5; }
+.status-completed { background-color: #DBEAFE; color: #1E40AF; }
 .details-row td { padding: 0; border-bottom: 1px solid #E5E7EB; background-color: #FAFAFA; }
 .details-cell { padding-bottom: 1.5rem !important; }
 .medical-history-container { margin: 0 1rem 1rem 1rem; background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }
