@@ -47,8 +47,6 @@
             <option value="">All Statuses</option>
             <option value="Available">Available</option>
             <option value="Pending">Pending</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Adopted">Adopted</option>
           </select>
         </div>
 
@@ -164,20 +162,18 @@
                 <div v-if="activeView === 'registry'" class="add-record-form">
                   <h4>+ Add Adoption Status Change</h4>
                   <div class="form-row">
-                    <input type="date" v-model="newAdoptionStatus[animal.id].date" class="input-field">
+                    <input type="date" v-model="newAdoptionStatus[animal.id].date" :max="today" class="input-field">
                     <select v-model="newAdoptionStatus[animal.id].status" class="input-field">
                       <option value="" disabled>Select status</option>
-                      <option value="Available">Available</option>
-                      <option value="Pending">Pending</option>
-                      <option value="On Hold">On Hold</option>
-                      <option value="Adopted">Adopted</option>
-                      <option value="Finalized">Finalized</option>
+                      <option value="Available" :disabled="animal.status === 'Available'">Available</option>
+                      <option value="Pending" :disabled="animal.status === 'Pending'">Pending</option>
+                      <option value="Completed" :disabled="animal.status === 'Completed'">Completed</option>
                     </select>
                   </div>
                   <div class="form-row">
                     <input type="text" v-model="newAdoptionStatus[animal.id].owner" placeholder="Owner" class="input-field flex-grow">
                     <input type="text" v-model="newAdoptionStatus[animal.id].notes" placeholder="Description (optional)" class="input-field flex-grow">
-                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animalId)">Save</button>
+                    <button class="secondary-btn" @click="submitAdoptionStatusChange(animal.id)">Save</button>
                   </div>
                 </div>
               </div>
@@ -239,7 +235,6 @@ const medicalRecordTypes = ref([])
 const activeView = ref('registry')
 const showAddModal = ref(false)
 
-// Zmiana age: 0 na birthDate: ''
 const newAnimal = ref({ name: '', species: 'Dog', birthDate: '', status: 'Available' })
 const today = new Date().toISOString().split('T')[0]
 const newMedical = ref({})
@@ -254,9 +249,10 @@ const filters = ref({
 
 const filteredAnimals = computed(() => {
   return animals.value.filter(animal => {
+    // Registry łapie Available i Pending. Archive łapie Completed.
     const matchesView = activeView.value === 'registry' 
-      ? animal.status !== 'Finalized' 
-      : animal.status === 'Finalized'
+      ? animal.status !== 'Completed' 
+      : animal.status === 'Completed'
 
     if (!matchesView) return false
 
@@ -317,7 +313,7 @@ const fetchAnimals = async () => {
         photo: animal.species === 'Cat' ? '🐱' : (animal.species === 'Dog' ? '🐕' : '🐾'),
         name: animal.name,
         species: animal.species,
-        age: animal.age ?? 0, // dynamiczny age pobierany z getAge() z backendu
+        age: animal.age ?? 0, 
         kennel: animal.kennel ? animal.kennel.code : '-',
         status: animal.adoptionStatus,
         date: new Date().toISOString().split('T')[0],
@@ -379,7 +375,6 @@ const submitNewAnimal = async () => {
   if (!newAnimal.value.name) return alert("Please provide the animal's name!");
   if (!newAnimal.value.birthDate) return alert("Please select a birth date!");
   
-  // Nowa walidacja daty z przyszłości
   if (newAnimal.value.birthDate > today) {
     return alert("Birth date cannot be in the future!");
   }
@@ -434,7 +429,19 @@ const submitMedicalRecord = async (animalId) => {
 
 const submitAdoptionStatusChange = async (animalId) => {
   const recordData = newAdoptionStatus.value[animalId];
-  if (!recordData.date || !recordData.status || !recordData.owner) return alert("Please fill in the date, status, and owner!");
+  const animal = animals.value.find(a => a.id === animalId);
+
+  if (!recordData.date || !recordData.status || !recordData.owner) {
+    return alert("Please fill in the date, status, and owner!");
+  }
+
+  if (recordData.date > today) {
+    return alert("The date cannot be in the future!");
+  }
+
+  if (animal && recordData.status === animal.status) {
+    return alert("The new status must be different from the current one!");
+  }
 
   try {
     await axios.patch(`http://localhost:8080/api/animals/${animalId}/adoption-status`, {
@@ -449,7 +456,6 @@ const submitAdoptionStatusChange = async (animalId) => {
       animal: { id: animalId }
     })
 
-    const animal = animals.value.find(a => a.id === animalId);
     if (animal) {
       animal.status = recordData.status
       if (!animal.adoptionStatusHistory) {
@@ -461,9 +467,14 @@ const submitAdoptionStatusChange = async (animalId) => {
         owner: recordData.owner,
         notes: recordData.notes || null
       })
+      
+      // Jeśli status to Completed, usuń z widoku schroniska (przenosi do archiwum)
+      if(recordData.status === 'Completed') {
+         animal.kennel = '-';
+      }
     }
 
-    newAdoptionStatus.value[animalId] = { date: new Date().toISOString().split('T')[0], status: '', owner: '', notes: '' };
+    newAdoptionStatus.value[animalId] = { date: today, status: '', owner: '', notes: '' };
   } catch (error) {
     console.error("Error saving adoption status change:", error)
     alert("An error occurred while saving the adoption status change.");
@@ -501,9 +512,7 @@ const getStatusClass = (status) => {
   switch(status) {
     case 'Available': return 'status-available';
     case 'Pending': return 'status-pending';
-    case 'On Hold': return 'status-on-hold';
-    case 'Adopted': return 'status-adopted';
-    case 'Finalized': return 'status-finalized';
+    case 'Completed': return 'status-completed';
     default: return '';
   }
 }
@@ -533,9 +542,7 @@ onActivated(() => {
 .status-badge { padding: 0.35rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 500; display: inline-block; }
 .status-available { background-color: #D1FAE5; color: #065F46; }
 .status-pending { background-color: #FEF3C7; color: #92400E; }
-.status-on-hold { background-color: #F3F4F6; color: #4B5563; }
-.status-adopted { background-color: #DBEAFE; color: #1E40AF; }
-.status-finalized { background-color: #DDD6FE; color: #4F46E5; }
+.status-completed { background-color: #DBEAFE; color: #1E40AF; }
 .details-row td { padding: 0; border-bottom: 1px solid #E5E7EB; background-color: #FAFAFA; }
 .details-cell { padding-bottom: 1.5rem !important; }
 .medical-history-container { margin: 0 1rem 1rem 1rem; background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; }

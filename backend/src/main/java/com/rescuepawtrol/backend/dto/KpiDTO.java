@@ -7,21 +7,20 @@ public class KpiDTO {
     private String trendAdoptions;
     private int interventions;
     private String trendInterventions;
-    private int avgStay;
+    private int quarantined;
 
     public KpiDTO() {
     }
 
-    public KpiDTO(int totalAnimals, String trendAnimals, int totalAdoptions, String trendAdoptions, int interventions, String trendInterventions, int avgStay) {
+    public KpiDTO(int totalAnimals, String trendAnimals, int totalAdoptions, String trendAdoptions, int interventions, String trendInterventions, int quarantined) {
         this.totalAnimals = totalAnimals;
         this.trendAnimals = trendAnimals;
         this.totalAdoptions = totalAdoptions;
         this.trendAdoptions = trendAdoptions;
         this.interventions = interventions;
         this.trendInterventions = trendInterventions;
-        this.avgStay = avgStay;
+        this.quarantined = quarantined;
     }
-
 
     public int getTotalAnimals() {
         return totalAnimals;
@@ -71,11 +70,11 @@ public class KpiDTO {
         this.trendInterventions = trendInterventions;
     }
 
-    public int getAvgStay() {
-        return avgStay;
+    public int getQuarantined() {
+        return quarantined;
     }
 
-    public void setAvgStay(int avgStay) {
-        this.avgStay = avgStay;
+    public void setQuarantined(int quarantined) {
+        this.quarantined = quarantined;
     }
 }
