@@ -106,16 +106,17 @@ const interventionMarkers = new Map()
 
 const completingIds = new Set()
 
-// Tryb jazdy: 'api' = pobiera z backendu, 'route' = jedzie po wyznaczonej trasie
-let drivingMode = 'api'
+// Tryb jazdy: 'api' = pobiera z backendu, 'route' = jedzie po wyznaczonej trasie, 'wander' = błądzi losowo
+let drivingMode = 'wander'
 
 let trackingInterval = null
 let animationInterval = null
 let routeCoords = []
 
+const SPEED = 0.000015
+let targetWanderPoint = null
+
 // ─── IKONA SAMOCHODZIKU ───────────────────────────────────────────────────────
-// Używamy zwykłego L.marker z emoji w divIcon — BEZ position:absolute i transform,
-// bo to powoduje "latanie". iconAnchor centruje ikonę na pozycji GPS.
 const getDriverIcon = () => L.divIcon({
   className: '',
   html: `<div style="
@@ -169,11 +170,47 @@ const initMap = () => {
   map.value.on('click', handleMapClick)
 }
 
+// ─── LOSOWE BŁĄDZENIE ────────────────────────────────────────────────────────
+const getRandomOffset = () => (Math.random() - 0.5) * 0.004
+
+const startWandering = () => {
+  drivingMode = 'wander'
+  if (animationInterval) clearInterval(animationInterval)
+
+  if (!targetWanderPoint) {
+    targetWanderPoint = {
+      lat: driverPos.lat + getRandomOffset(),
+      lng: driverPos.lng + getRandomOffset()
+    }
+  }
+
+  animationInterval = setInterval(() => {
+    const dLat = targetWanderPoint.lat - driverPos.lat
+    const dLng = targetWanderPoint.lng - driverPos.lng
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng)
+
+    if (dist < SPEED) {
+      targetWanderPoint = {
+        lat: driverPos.lat + getRandomOffset(),
+        lng: driverPos.lng + getRandomOffset()
+      }
+    } else {
+      driverPos = {
+        lat: driverPos.lat + dLat * (SPEED / dist),
+        lng: driverPos.lng + dLng * (SPEED / dist)
+      }
+    }
+
+    driverMarker.setLatLng([driverPos.lat, driverPos.lng])
+    checkProximity()
+  }, 50)
+}
+
 // ─── TRYB API: ciągłe pobieranie pozycji z backendu ──────────────────────────
 const startLiveTracking = () => {
   if (trackingInterval) return
   trackingInterval = setInterval(async () => {
-    if (drivingMode !== 'api') return // nie nadpisuj podczas jazdy po trasie
+    if (drivingMode !== 'api') return
     try {
       const response = await axios.get('http://localhost:8080/api/driver/location', {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` }
@@ -181,7 +218,7 @@ const startLiveTracking = () => {
       driverPos = { lat: response.data.latitude, lng: response.data.longitude }
       driverMarker.setLatLng([driverPos.lat, driverPos.lng])
     } catch (e) {
-      // backend niedostępny — samochodzik stoi w miejscu, nic się nie psuje
+      // backend niedostępny
     }
   }, 3000)
 }
@@ -195,7 +232,8 @@ const animateAlongRoute = () => {
   if (routeCoords.length < 2) return
   drivingMode = 'route'
   let targetIdx = 1
-  const SPEED = 0.000015
+
+  if (animationInterval) { clearInterval(animationInterval); animationInterval = null }
 
   animationInterval = setInterval(() => {
     const targetLat = routeCoords[targetIdx][0]
@@ -213,7 +251,9 @@ const animateAlongRoute = () => {
         animationInterval = null
         if (routeLine.value) { map.value.removeLayer(routeLine.value); routeLine.value = null }
         isRouteGenerated.value = false
-        drivingMode = 'api' // oddaj sterowanie z powrotem API
+        
+        targetWanderPoint = null
+        startWandering() // Zaczyna błądzić
         return
       }
     } else {
@@ -230,7 +270,6 @@ const animateAlongRoute = () => {
 
 // ─── AUTO-COMPLETE przy przejeździe ──────────────────────────────────────────
 const checkProximity = () => {
-  // kopia tablicy bo completeIntervention mutuje interventions.value
   const current = [...interventions.value]
   current.forEach(report => {
     const dLat = report.latitude - driverPos.lat
@@ -279,7 +318,9 @@ const clearRoute = () => {
   if (animationInterval) { clearInterval(animationInterval); animationInterval = null }
   if (routeLine.value) { map.value.removeLayer(routeLine.value); routeLine.value = null }
   isRouteGenerated.value = false
-  drivingMode = 'api'
+  
+  targetWanderPoint = null
+  startWandering() // Wraca do błądzenia po czyszczeniu trasy
 }
 
 // ─── INTERWENCJE ──────────────────────────────────────────────────────────────
@@ -301,7 +342,7 @@ const fetchInterventions = async () => {
 }
 
 const completeIntervention = async (id) => {
-  if (completingIds.has(id)) return          // już lecisz request, pomiń
+  if (completingIds.has(id)) return
   if (!interventions.value.find(i => i.id === id)) return
   completingIds.add(id)
   try {
@@ -367,6 +408,7 @@ onMounted(() => {
   initMap()
   fetchInterventions()
   startLiveTracking()
+  startWandering()
 })
 
 onBeforeUnmount(() => {
