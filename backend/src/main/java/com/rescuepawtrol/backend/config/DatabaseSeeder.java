@@ -9,7 +9,9 @@ import org.springframework.context.annotation.Configuration;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 @Configuration
 public class DatabaseSeeder {
@@ -50,140 +52,100 @@ public class DatabaseSeeder {
             }
 
             // ─── 2. KENNELS — 4 per type ─────────────────────────────────────
-            Kennel d1=null, d2=null, c1=null, c2=null, o1=null, q1=null, q2=null, q3=null;
+            Kennel d1=null, d2=null, d3=null, d4=null;
+            Kennel c1=null, c2=null, c3=null, c4=null;
+            Kennel o1=null, o2=null, o3=null, o4=null;
+            Kennel q1=null, q2=null, q3=null, q4=null;
 
             if (kennelRepository.count() == 0) {
-                d1 = kennel("D1", KennelType.DOGS, 4);
-                d2 = kennel("D2", KennelType.DOGS, 4);
-                Kennel d3 = kennel("D3", KennelType.DOGS, 3);
-                Kennel d4 = kennel("D4", KennelType.DOGS, 3);
+                d1 = kennel("D1", KennelType.DOGS, 4); d2 = kennel("D2", KennelType.DOGS, 4);
+                d3 = kennel("D3", KennelType.DOGS, 4); d4 = kennel("D4", KennelType.DOGS, 3);
 
-                c1 = kennel("C1", KennelType.CATS, 4);
-                c2 = kennel("C2", KennelType.CATS, 4);
-                Kennel c3 = kennel("C3", KennelType.CATS, 3);
-                Kennel c4 = kennel("C4", KennelType.CATS, 3);
+                c1 = kennel("C1", KennelType.CATS, 4); c2 = kennel("C2", KennelType.CATS, 4);
+                c3 = kennel("C3", KennelType.CATS, 3); c4 = kennel("C4", KennelType.CATS, 3);
 
-                o1 = kennel("O1", KennelType.OTHER, 3);
-                Kennel o2 = kennel("O2", KennelType.OTHER, 3);
-                Kennel o3 = kennel("O3", KennelType.OTHER, 2);
-                Kennel o4 = kennel("O4", KennelType.OTHER, 2);
+                o1 = kennel("O1", KennelType.OTHER, 3); o2 = kennel("O2", KennelType.OTHER, 3);
+                o3 = kennel("O3", KennelType.OTHER, 2); o4 = kennel("O4", KennelType.OTHER, 2);
 
                 Kennel i1 = kennel("I1", KennelType.ISOLATION_WARD, 2);
                 Kennel i2 = kennel("I2", KennelType.ISOLATION_WARD, 2);
 
-                q1 = kennel("Q1", KennelType.QUARANTINE, 2);
-                q2 = kennel("Q2", KennelType.QUARANTINE, 2);
-                q3 = kennel("Q3", KennelType.QUARANTINE, 1);
-                Kennel q4 = kennel("Q4", KennelType.QUARANTINE, 1);
+                q1 = kennel("Q1", KennelType.QUARANTINE, 2); q2 = kennel("Q2", KennelType.QUARANTINE, 2);
+                q3 = kennel("Q3", KennelType.QUARANTINE, 1); q4 = kennel("Q4", KennelType.QUARANTINE, 1);
 
                 kennelRepository.saveAll(List.of(
-                        d1, d2, d3, d4,
-                        c1, c2, c3, c4,
-                        o1, o2, o3, o4,
-                        i1, i2,
-                        q1, q2, q3, q4
+                        d1, d2, d3, d4, c1, c2, c3, c4, o1, o2, o3, o4, i1, i2, q1, q2, q3, q4
                 ));
                 System.out.println("✅ Seeded: Kennels");
             } else {
                 List<Kennel> kennels = kennelRepository.findAll();
                 if(!kennels.isEmpty()) {
                     d1 = kennels.stream().filter(k -> k.getCode().equals("D1")).findFirst().orElse(null);
+                    d2 = kennels.stream().filter(k -> k.getCode().equals("D2")).findFirst().orElse(null);
+                    d3 = kennels.stream().filter(k -> k.getCode().equals("D3")).findFirst().orElse(null);
+                    d4 = kennels.stream().filter(k -> k.getCode().equals("D4")).findFirst().orElse(null);
                     c1 = kennels.stream().filter(k -> k.getCode().equals("C1")).findFirst().orElse(null);
+                    c2 = kennels.stream().filter(k -> k.getCode().equals("C2")).findFirst().orElse(null);
+                    c3 = kennels.stream().filter(k -> k.getCode().equals("C3")).findFirst().orElse(null);
+                    c4 = kennels.stream().filter(k -> k.getCode().equals("C4")).findFirst().orElse(null);
                     o1 = kennels.stream().filter(k -> k.getCode().equals("O1")).findFirst().orElse(null);
+                    o2 = kennels.stream().filter(k -> k.getCode().equals("O2")).findFirst().orElse(null);
+                    o3 = kennels.stream().filter(k -> k.getCode().equals("O3")).findFirst().orElse(null);
+                    o4 = kennels.stream().filter(k -> k.getCode().equals("O4")).findFirst().orElse(null);
                     q1 = kennels.stream().filter(k -> k.getCode().equals("Q1")).findFirst().orElse(null);
                     q2 = kennels.stream().filter(k -> k.getCode().equals("Q2")).findFirst().orElse(null);
                     q3 = kennels.stream().filter(k -> k.getCode().equals("Q3")).findFirst().orElse(null);
+                    q4 = kennels.stream().filter(k -> k.getCode().equals("Q4")).findFirst().orElse(null);
                 }
             }
 
-            // ─── 3. ANIMALS (Zaktualizowane statusy + przypisanie boksów) ────
+            // ─── 3, 4, 5, 6. ANIMALS, RECORDS, CARDS & HISTORIES ──────────────
             if (animalRepository.count() == 0) {
-                // Zwierzęta COMPLETED zawsze mają kennel = null
-                // Dogs
-                Animal a1  = animal("Buddy",    "Dog",    LocalDate.now().minusYears(3), "Available", false, d1);
-                Animal a2  = animal("Max",      "Dog",    LocalDate.now().minusYears(5), "Completed", false, null);
-                Animal a3  = animal("Rocky",    "Dog",    LocalDate.now().minusYears(2), "Pending",   false, d1);
-                Animal a4  = animal("Charlie",  "Dog",    LocalDate.now().minusYears(4), "Completed", false, null);
-                Animal a5  = animal("Duke",     "Dog",    LocalDate.now().minusYears(6), "Available", false, d1);
-                Animal a6  = animal("Bella",    "Dog",    LocalDate.now().minusYears(1), "Available", false, d2);
-                Animal a7  = animal("Rex",      "Dog",    LocalDate.now().minusYears(7), "Available", true,  q1); // Kwarantanna -> Q1
+                List<Animal> animals = new ArrayList<>();
+                List<AdoptionCard> cards = new ArrayList<>();
+                List<MedicalRecord> records = new ArrayList<>();
+                List<AdoptionStatusHistory> histories = new ArrayList<>();
 
-                // Cats
-                Animal a8  = animal("Whiskers", "Cat",    LocalDate.now().minusYears(2), "Available", false, c1);
-                Animal a9  = animal("Luna",     "Cat",    LocalDate.now().minusYears(1), "Pending",   false, null);
-                Animal a10 = animal("Mittens",  "Cat",    LocalDate.now().minusYears(4), "Completed", false, null);
-                Animal a11 = animal("Shadow",   "Cat",    LocalDate.now().minusYears(3), "Pending",   false, c2);
-                Animal a12 = animal("Cleo",     "Cat",    LocalDate.now().minusYears(5), "Completed", false, null);
-                Animal a13 = animal("Nala",     "Cat",    LocalDate.now().minusYears(2), "Available", true,  q2); // Kwarantanna -> Q2
-                Animal a14 = animal("Simba",    "Cat",    LocalDate.now().minusYears(6), "Available", false, c2);
+                Random rand = new Random(42); 
+                LocalDate endDate = LocalDate.of(2026, 6, 18);
+                LocalDate startDate = endDate.minusMonths(6);
 
-                // Other
-                Animal a15 = animal("Thumper",  "Rabbit", LocalDate.now().minusYears(2), "Available", false, o1);
-                Animal a16 = animal("Hazel",    "Rabbit", LocalDate.now().minusYears(1), "Pending",   false, o1);
-                Animal a17 = animal("Tweety",   "Bird",   LocalDate.now().minusYears(3), "Available", false, o1);
-                Animal a18 = animal("Polly",    "Bird",   LocalDate.now().minusYears(4), "Available", false, null);
-                Animal a19 = animal("Nibbles",  "Hamster",LocalDate.now().minusYears(1), "Completed", false, null);
-                Animal a20 = animal("Patches",  "Rabbit", LocalDate.now().minusYears(2), "Available", true,  q3); // Kwarantanna -> Q3
+                List<Kennel> dKennels = List.of(d1, d2, d3, d4);
+                List<Kennel> cKennels = List.of(c1, c2, c3, c4);
+                List<Kennel> oKennels = List.of(o1, o2, o3, o4);
+                List<Kennel> qKennels = List.of(q1, q2, q3, q4);
 
-                animalRepository.saveAll(List.of(
-                        a1,  a2,  a3,  a4,  a5,  a6,  a7,
-                        a8,  a9,  a10, a11, a12, a13, a14,
-                        a15, a16, a17, a18, a19, a20
-                ));
-                System.out.println("✅ Seeded: Animals (Unified statuses & kennels updated)");
+                String[] dogNames = {"Buddy", "Max", "Rex", "Bella", "Luna", "Charlie", "Duke", "Rocky", "Zoe", "Milo", "Bailey", "Rover", "Buster", "Lucy", "Daisy"};
+                String[] catNames = {"Whiskers", "Mittens", "Shadow", "Cleo", "Nala", "Simba", "Leo", "Chloe", "Kitty", "Loki", "Oreo", "Jasper", "Smokey", "George", "Lily"};
+                String[] rabbitNames = {"Thumper", "Hazel", "Patches", "Bugs", "Snowball", "Oreo", "Clover", "Bunny"};
+                String[] birdNames = {"Tweety", "Polly", "Rio", "Sunny", "Kiwi", "Mango", "Sky", "Blue"};
+
+                // Generowanie 60 zakończonych adopcji w ciągu ostatnich 6 miesięcy (dane dla wykresów liniowych)
+                for(int i=0; i<25; i++) generateAnimalData(animals, cards, records, histories, dogNames[i%dogNames.length] + " " + i, "Dog", "Completed", false, null, rand, startDate, endDate);
+                for(int i=0; i<20; i++) generateAnimalData(animals, cards, records, histories, catNames[i%catNames.length] + " " + i, "Cat", "Completed", false, null, rand, startDate, endDate);
+                for(int i=0; i<8; i++) generateAnimalData(animals, cards, records, histories, rabbitNames[i%rabbitNames.length] + " " + i, "Rabbit", "Completed", false, null, rand, startDate, endDate);
+                for(int i=0; i<7; i++) generateAnimalData(animals, cards, records, histories, birdNames[i%birdNames.length] + " " + i, "Bird", "Completed", false, null, rand, startDate, endDate);
+
+                // Generowanie 34 zwierząt aktualnie w schronisku (dane dla wykresu kołowego)
+                for(int i=0; i<15; i++) generateAnimalData(animals, cards, records, histories, dogNames[(i+5)%dogNames.length] + " " + (i+25), "Dog", i%4==0?"Pending":"Available", false, dKennels.get(i%dKennels.size()), rand, startDate, endDate);
+                for(int i=0; i<11; i++) generateAnimalData(animals, cards, records, histories, catNames[(i+3)%catNames.length] + " " + (i+20), "Cat", i%4==0?"Pending":"Available", false, cKennels.get(i%cKennels.size()), rand, startDate, endDate);
+                for(int i=0; i<4; i++) generateAnimalData(animals, cards, records, histories, rabbitNames[(i+2)%rabbitNames.length] + " " + (i+8), "Rabbit", "Available", false, oKennels.get(i%oKennels.size()), rand, startDate, endDate);
+                for(int i=0; i<4; i++) generateAnimalData(animals, cards, records, histories, birdNames[(i+1)%birdNames.length] + " " + (i+7), "Bird", "Available", false, oKennels.get((i+2)%oKennels.size()), rand, startDate, endDate);
+
+                // Generowanie 6 zwierząt na kwarantannie (dla kafelka KPI)
+                for(int i=0; i<3; i++) generateAnimalData(animals, cards, records, histories, dogNames[(i+1)%dogNames.length] + " Q" + i, "Dog", "Available", true, qKennels.get(i%qKennels.size()), rand, startDate, endDate);
+                for(int i=0; i<2; i++) generateAnimalData(animals, cards, records, histories, catNames[(i+4)%catNames.length] + " Q" + i, "Cat", "Available", true, qKennels.get((i+2)%qKennels.size()), rand, startDate, endDate);
+                for(int i=0; i<1; i++) generateAnimalData(animals, cards, records, histories, rabbitNames[(i+5)%rabbitNames.length] + " Q" + i, "Rabbit", "Available", true, qKennels.get(3), rand, startDate, endDate);
+
+                animalRepository.saveAll(animals);
+                adoptionCardRepository.saveAll(cards);
+                adoptionStatusHistoryRepository.saveAll(histories);
+                medicalRecordRepository.saveAll(records);
+
+                System.out.println("✅ Seeded: 100 Animals + Adoptions + Medical Records (optimized for 6-months reports)");
             }
 
-            // ─── 4. ADOPTION STATUS HISTORY ──────────────────────────────────
-            if (adoptionStatusHistoryRepository.count() == 0 && animalRepository.count() > 0) {
-                List<Animal> animals = animalRepository.findAll();
-
-                // Historia dla Maxa (Completed)
-                AdoptionStatusHistory h1 = createStatusHistory(animals.get(1), LocalDate.of(2026, 5, 10), "Pending", "Kowalski", "Wizyta zapoznawcza.");
-                AdoptionStatusHistory h2 = createStatusHistory(animals.get(1), LocalDate.of(2026, 5, 20), "Completed", "Kowalski", "Podpisano umowę i wydano zwierzę.");
-
-                // Historia dla Rocky'ego (Pending)
-                AdoptionStatusHistory h3 = createStatusHistory(animals.get(2), LocalDate.of(2026, 5, 28), "Pending", "Anna Nowak", "Czekamy na weryfikację warunków.");
-
-                // Historia dla Mittens (Completed)
-                AdoptionStatusHistory h4 = createStatusHistory(animals.get(9), LocalDate.of(2026, 5, 15), "Pending", "Tomasz Lis", "Rezerwacja w toku.");
-                AdoptionStatusHistory h5 = createStatusHistory(animals.get(9), LocalDate.of(2026, 6, 2), "Completed", "Tomasz Lis", "Zwierzę wydane nowemu właścicielowi.");
-
-                // Historia dla Luny (Pending)
-                AdoptionStatusHistory h6 = createStatusHistory(animals.get(8), LocalDate.of(2026, 6, 5), "Pending", "Marek Mostowiak", "Złożono wniosek.");
-
-                adoptionStatusHistoryRepository.saveAll(List.of(h1, h2, h3, h4, h5, h6));
-                System.out.println("✅ Seeded: Adoption Status History");
-            }
-
-            // ─── 5. MEDICAL RECORDS ──────────────────────────────────────────
-            if (medicalRecordRepository.count() == 0 && animalRepository.count() > 0) {
-                List<Animal> animals = animalRepository.findAll();
-
-                MedicalRecord m1 = createMedicalRecord(animals.get(0), LocalDate.of(2026, 5, 12), "Standardowe odrobaczanie.");
-                MedicalRecord m2 = createMedicalRecord(animals.get(6), LocalDate.of(2026, 5, 18), "Rozpoczęcie kwarantanny - Rex.");
-                MedicalRecord m3 = createMedicalRecord(animals.get(2), LocalDate.of(2026, 5, 25), "Leczenie infekcji ucha.");
-                MedicalRecord m4 = createMedicalRecord(animals.get(12), LocalDate.of(2026, 6, 1), "Szczepienie na wściekliznę - Nala.");
-                MedicalRecord m5 = createMedicalRecord(animals.get(19), LocalDate.of(2026, 6, 8), "Przegląd weterynaryjny na kwarantannie - Patches.");
-
-                medicalRecordRepository.saveAll(List.of(m1, m2, m3, m4, m5));
-                System.out.println("✅ Seeded: Medical Records");
-            }
-
-            // ─── 6. ADOPTION CARDS ───────────────────────────────────────────
-            if (adoptionCardRepository.count() == 0 && animalRepository.count() > 0) {
-                List<Animal> animals = animalRepository.findAll();
-
-                AdoptionCard ac1 = createAdoptionCard(animals.get(2), LocalDate.of(2026, 5, 28), AdoptionStatus.PENDING); // Rocky
-                AdoptionCard ac2 = createAdoptionCard(animals.get(8), LocalDate.of(2026, 6, 5), AdoptionStatus.PENDING);  // Luna
-                AdoptionCard ac3 = createAdoptionCard(animals.get(9), LocalDate.of(2026, 5, 15), AdoptionStatus.COMPLETED); // Mittens
-                AdoptionCard ac4 = createAdoptionCard(animals.get(1), LocalDate.of(2026, 5, 10), AdoptionStatus.COMPLETED); // Max
-                AdoptionCard ac5 = createAdoptionCard(animals.get(15), LocalDate.of(2026, 5, 22), AdoptionStatus.PENDING);// Hazel
-
-                adoptionCardRepository.saveAll(List.of(ac1, ac2, ac3, ac4, ac5));
-                System.out.println("✅ Seeded: Adoption Cards");
-            }
-
-            // ─── 7. INTERVENTIONS & ROUTE POINTS ─────────────────────────────
+            // ─── 7. INTERVENTIONS & ROUTE POINTS (Bez zmian) ─────────────────
             if (interventionRepository.count() == 0 && driver != null) {
                 Intervention inv = new Intervention();
                 inv.setReportTime(LocalDateTime.now().minusHours(2));
@@ -215,7 +177,7 @@ public class DatabaseSeeder {
                 System.out.println("✅ Seeded: Interventions & Route Points");
             }
 
-            System.out.println("🚀 Baza danych jest w pełni gotowa do pracy z ujednoliconymi statusami!");
+            System.out.println("🚀 Baza danych jest w pełni gotowa do pracy z ujednoliconymi statusami i rozbudowanymi danymi raportowymi!");
         };
     }
 
@@ -229,44 +191,75 @@ public class DatabaseSeeder {
         return k;
     }
 
-    private Animal animal(String name, String species, LocalDate birthDate, String adoptionStatus, boolean isQuarantined, Kennel kennel) {
+    private void generateAnimalData(
+            List<Animal> animals, List<AdoptionCard> cards, List<MedicalRecord> records, List<AdoptionStatusHistory> histories,
+            String name, String species, String status, boolean isQuarantined, Kennel kennel,
+            Random rand, LocalDate start, LocalDate end) {
+
         Animal a = new Animal();
         a.setName(name);
         a.setSpecies(species);
-        a.setBirthDate(birthDate);
-        a.setAdoptionStatus(adoptionStatus);
+        a.setBirthDate(LocalDate.now().minusYears(rand.nextInt(7) + 1).minusMonths(rand.nextInt(12)));
+        a.setAdoptionStatus(status);
         a.setIsQuarantined(isQuarantined);
         a.setKennel(kennel);
-        return a;
-    }
+        animals.add(a);
 
-    private MedicalRecord createMedicalRecord(Animal animal, LocalDate date, String description) {
-        MedicalRecord m = new MedicalRecord();
-        m.setRecordDate(date);
-        m.setRecordType(MedicalRecordType.values()[0]);
-        m.setDescription(description);
-        m.setDoctor("Dr. Sarah Chen");
-        m.setAnimal(animal);
-        return m;
-    }
+        long startDay = start.toEpochDay();
+        long endDay = end.toEpochDay();
+        LocalDate randomDate = LocalDate.ofEpochDay(startDay + (long)(rand.nextDouble() * (endDay - startDay)));
 
-    private AdoptionCard createAdoptionCard(Animal animal, LocalDate date, AdoptionStatus status) {
-        AdoptionCard card = new AdoptionCard();
-        card.setStatus(status);
-        card.setCandidateDetails("System Generated Candidate");
-        card.setSubmissionDate(date);
-        card.setFinalizationDate(status == AdoptionStatus.COMPLETED ? date.plusDays(10) : null);
-        card.setAnimal(animal);
-        return card;
-    }
+        if ("Completed".equals(status)) {
+            AdoptionCard card = new AdoptionCard();
+            card.setStatus(AdoptionStatus.COMPLETED);
+            card.setCandidateDetails("Jan Kowalski " + rand.nextInt(1000));
+            card.setSubmissionDate(randomDate.minusDays(10));
+            card.setFinalizationDate(randomDate);
+            card.setAnimal(a);
+            cards.add(card);
 
-    private AdoptionStatusHistory createStatusHistory(Animal animal, LocalDate date, String status, String owner, String notes) {
-        AdoptionStatusHistory ash = new AdoptionStatusHistory();
-        ash.setAnimal(animal);
-        ash.setDate(date);
-        ash.setStatus(status);
-        ash.setOwner(owner);
-        ash.setNotes(notes);
-        return ash;
+            AdoptionStatusHistory ash = new AdoptionStatusHistory();
+            ash.setAnimal(a);
+            ash.setDate(randomDate);
+            ash.setStatus("Completed");
+            ash.setOwner(card.getCandidateDetails());
+            ash.setNotes("Zwierzę adoptowane pomyślnie.");
+            histories.add(ash);
+
+            MedicalRecord m = new MedicalRecord();
+            m.setRecordDate(randomDate.minusDays(14));
+            m.setRecordType(MedicalRecordType.values()[0]);
+            m.setDescription("Szczepienie i odrobaczenie przed adopcją.");
+            m.setDoctor("Dr. Sarah Chen");
+            m.setAnimal(a);
+            records.add(m);
+
+        } else if ("Pending".equals(status)) {
+            AdoptionCard card = new AdoptionCard();
+            card.setStatus(AdoptionStatus.PENDING);
+            card.setCandidateDetails("Anna Nowak " + rand.nextInt(1000));
+            card.setSubmissionDate(randomDate);
+            card.setFinalizationDate(null);
+            card.setAnimal(a);
+            cards.add(card);
+
+            AdoptionStatusHistory ash = new AdoptionStatusHistory();
+            ash.setAnimal(a);
+            ash.setDate(randomDate);
+            ash.setStatus("Pending");
+            ash.setOwner(card.getCandidateDetails());
+            ash.setNotes("Oczekiwanie na finalizację dokumentów.");
+            histories.add(ash);
+        }
+
+        if (!"Completed".equals(status)) {
+            MedicalRecord m = new MedicalRecord();
+            m.setRecordDate(randomDate);
+            m.setRecordType(MedicalRecordType.values()[0]);
+            m.setDescription(isQuarantined ? "Wstępne badanie kwarantannowe." : "Standardowa kontrola weterynaryjna w schronisku.");
+            m.setDoctor("Dr. Anna Kowal");
+            m.setAnimal(a);
+            records.add(m);
+        }
     }
 }
