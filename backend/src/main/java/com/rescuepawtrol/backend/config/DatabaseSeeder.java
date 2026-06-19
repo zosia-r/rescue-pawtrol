@@ -71,7 +71,7 @@ public class DatabaseSeeder {
                 Kennel i2 = kennel("I2", KennelType.ISOLATION_WARD, 2);
 
                 q1 = kennel("Q1", KennelType.QUARANTINE, 2); q2 = kennel("Q2", KennelType.QUARANTINE, 2);
-                q3 = kennel("Q3", KennelType.QUARANTINE, 1); q4 = kennel("Q4", KennelType.QUARANTINE, 1);
+                q3 = kennel("Q3", KennelType.QUARANTINE, 2); q4 = kennel("Q4", KennelType.QUARANTINE, 3);
 
                 kennelRepository.saveAll(List.of(
                         d1, d2, d3, d4, c1, c2, c3, c4, o1, o2, o3, o4, i1, i2, q1, q2, q3, q4
