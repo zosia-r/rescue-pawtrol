@@ -1,54 +1,51 @@
 package com.rescuepawtrol.backend.controller.mock;
 
-import org.springframework.context.annotation.Profile;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 @RestController
-@RequestMapping("/api/tracking")
+@RequestMapping("/api/driver")
+@CrossOrigin(origins = "*") // Dostosuj do swoich potrzeb bezpieczeństwa CORS
 public class TrackingController {
 
-    private final double[][] patrolRoute = {
-            {51.105000, 17.035000},
-            {51.107883, 17.038538},
-            {51.110000, 17.030000},
-            {51.102000, 17.025000}
-    };
+    // Start z pozycji bazy schroniska
+    private double latitude = 51.110000;
+    private double longitude = 17.030000;
+    
+    // Prędkość poruszania się w stopniach na krok (~0.0003 stopnia na krok daje zbliżoną dynamikę)
+    private static final double STEP_SIZE = 0.0003;
+    private final Random random = new Random();
 
-    private int currentTargetIndex = 1;
-    private double currentLat = patrolRoute[0][0];
-    private double currentLng = patrolRoute[0][1];
+    // Aktualny kąt poruszania się w radianach
+    private double currentHeading = random.nextDouble() * 2 * Math.PI;
 
-    private final double SPEED = 0.0002;
+    @GetMapping("/location")
+    public synchronized Map<String, Double> getLiveLocation() {
+        // Zmiana kierunku o mały losowy kąt (od -45 do +45 stopni), aby ruch był płynniejszy niż totalnie losowe skoki
+        double angleChange = (random.nextDouble() - 0.5) * (Math.PI / 2);
+        currentHeading += angleChange;
 
-    @GetMapping("/unit1")
-    public Map<String, Double> getCarLocation() {
-        double targetLat = patrolRoute[currentTargetIndex][0];
-        double targetLng = patrolRoute[currentTargetIndex][1];
+        // Wyliczenie nowej pozycji
+        latitude += Math.sin(currentHeading) * STEP_SIZE;
+        longitude += Math.cos(currentHeading) * STEP_SIZE;
 
-        double dLat = targetLat - currentLat;
-        double dLng = targetLng - currentLng;
-        double distanceToTarget = Math.sqrt(dLat * dLat + dLng * dLng);
-
-        if (distanceToTarget < SPEED) {
-            currentLat = targetLat;
-            currentLng = targetLng;
-
-            currentTargetIndex = (currentTargetIndex + 1) % patrolRoute.length;
-        } else {
-            double ratio = SPEED / distanceToTarget;
-            currentLat += dLat * ratio;
-            currentLng += dLng * ratio;
+        // Ograniczenie ruchu do okolic Wrocławia, aby autko nie uciekło z mapy
+        if (latitude < 51.05 || latitude > 51.15 || longitude < 16.95 || longitude > 17.15) {
+            // Zawróć w stronę bazy
+            double toBaseLat = 51.110000 - latitude;
+            double toBaseLng = 17.030000 - longitude;
+            currentHeading = Math.atan2(toBaseLat, toBaseLng);
         }
 
-        Map<String, Double> location = new HashMap<>();
-        location.put("latitude", currentLat);
-        location.put("longitude", currentLng);
-
-        return location;
+        Map<String, Double> coords = new HashMap<>();
+        coords.put("latitude", latitude);
+        coords.put("longitude", longitude);
+        return coords;
     }
 }
