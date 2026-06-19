@@ -373,21 +373,24 @@ const cancelNewReport = () => {
   if (tempMarker) { map.value.removeLayer(tempMarker); tempMarker = null }
 }
 
+//  NAPRAWIONA METODA (Vue)
 const submitNewReport = async () => {
   try {
     const userDesc = newReportData.value.description
+    
     const res = await axios.post('http://localhost:8080/api/interventions', {
       latitude: newReportData.value.latitude,
-      longitude: newReportData.value.longitude
+      longitude: newReportData.value.longitude,
+      description: userDesc // <-- Dodaj tę linijkę
     }, { headers: { Authorization: `Bearer ${localStorage.getItem('jwt_token')}` } })
 
-    const savedReport = { ...res.data, description: userDesc }
+    const savedReport = res.data // Serwer zwróci już obiekt z zapisanym opisem
     interventions.value.unshift(savedReport)
 
     if (tempMarker) { map.value.removeLayer(tempMarker); tempMarker = null }
 
     const marker = L.marker([savedReport.latitude, savedReport.longitude], { icon: getCustomIcon('Intervention') })
-      .bindPopup(`<b>${userDesc || 'Intervention'} #${savedReport.id}</b>`)
+      .bindPopup(`<b>${savedReport.description || 'Intervention'} #${savedReport.id}</b>`)
       .addTo(map.value)
     interventionMarkers.set(savedReport.id, marker)
 
