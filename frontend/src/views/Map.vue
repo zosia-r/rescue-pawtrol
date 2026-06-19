@@ -32,7 +32,12 @@
           </div>
           <p class="location-text">📍 Lat: {{ report.latitude.toFixed(4) }}, Lng: {{ report.longitude.toFixed(4) }}</p>
           <div class="card-footer">
-            <span>Animals Affected: <strong>{{ report.animalsCount || 1 }}</strong></span>
+            <span>
+              Reported: 
+              <strong>
+                {{ report.reportTime ? new Date(report.reportTime + 'Z').toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '---' }}
+              </strong>
+            </span>
             <button v-if="appMode === 'DRIVER'" @click.stop="completeIntervention(report.id)" class="complete-btn">
               ✓ Complete
             </button>
